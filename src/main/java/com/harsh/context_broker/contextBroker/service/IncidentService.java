@@ -27,4 +27,8 @@ public class IncidentService {
         repository.save(incident);
 
     }
+    public IncidentEntity getIncidentByKey(String incidentKey){
+        return repository.findByIncidentKey(incidentKey)
+                .orElseThrow(()-> new RuntimeException("Incident not found"));
+    }
 }
