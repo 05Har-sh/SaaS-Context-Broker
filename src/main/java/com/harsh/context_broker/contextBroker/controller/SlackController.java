@@ -1,5 +1,6 @@
 package com.harsh.context_broker.contextBroker.controller;
 
+import com.harsh.context_broker.contextBroker.dto.UpdateResponse;
 import com.harsh.context_broker.contextBroker.service.IncidentService;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,10 +19,15 @@ public class SlackController {
         this.incidentService = incidentService;
     }
     @PostMapping("/slack")
-    public void recieveSlack(@RequestBody Map<String, Object> payload){
+    public UpdateResponse recieveSlack(@RequestBody Map<String, Object> payload){
         String incidentKey = payload.get("incidentKey").toString();
         String message = payload.get("message").toString();
+        String alert = incidentService.handleUpdate(incidentKey, message);
 
-        incidentService.handleUpdate(incidentKey, message);
+        UpdateResponse response = new UpdateResponse();
+        response.setIncidentKey(incidentKey);
+        response.setAlert(alert);
+
+        return response;
     }
 }
