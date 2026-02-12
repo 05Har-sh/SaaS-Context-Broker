@@ -22,7 +22,7 @@ public class JiraaController {
         String incidentKey = payload.get("incidentKey").toString();
         String status = payload.get("status").toString();
 
-        String alert = incidentService.handleUpdate(incidentKey, "Jira status :" + status);
+        String alert = incidentService.handleJiraUpdate(incidentKey,  status);
 
         UpdateResponse response = new UpdateResponse();
         response.setIncidentKey(incidentKey);
@@ -30,5 +30,4 @@ public class JiraaController {
 
         return response;
     }
-
 }

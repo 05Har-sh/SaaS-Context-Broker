@@ -36,13 +36,31 @@ public class IncidentService {
     }
 
     private String evaluateAlert(IncidentEntity incident) {
-        String alert = null;
+
         String message = incident.getLastMsg();
+        String jiraStatus = incident.getJiraStatus();
 
         if (message != null && message.contains("URGENT")) {
-            alert = "🚨 ALERT: Urgent incident detected: " + incident.getIncidentKey();
+            if(jiraStatus == null){
+                return "🚨ESCALATION: Slack marked URGENT but Jira has no Status yet ->" + incident.getIncidentKey();
+            }
+            if("OPEN".equals(jiraStatus)){
+                return "🚨ESCALATION: Slack marked URGENT but Jira still OPEN ->" + incident.getIncidentKey();
+            }
         }
-        return alert;
+        return null;
+    }
+    public String handleJiraUpdate(String incidentKey, String status){
+        IncidentEntity incident = repository.findByIncidentKey(incidentKey)
+                .orElseGet(()->{
+                    IncidentEntity i = new IncidentEntity();
+                    i.setIncidentKey(incidentKey);
+                    return i;
+                });
+        incident.setJiraStatus(status);
+        incident.setLastUpdated(LocalDateTime.now());
+        repository.save(incident);
+        return evaluateAlert(incident);
     }
 }
 

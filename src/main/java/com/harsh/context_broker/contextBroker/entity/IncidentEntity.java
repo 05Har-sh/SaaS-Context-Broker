@@ -16,6 +16,15 @@ public class IncidentEntity {
     private String LastMsg;
     private LocalDateTime lastUpdated;
     private LocalDateTime postedAt;
+    private String jiraStatus;
+
+    public String getJiraStatus() {
+        return jiraStatus;
+    }
+
+    public void setJiraStatus(String jiraStatus) {
+        this.jiraStatus = jiraStatus;
+    }
 
     public Long getId() {
         return id;
@@ -55,5 +64,17 @@ public class IncidentEntity {
 
     public void setPostedAt(LocalDateTime postedAt) {
         this.postedAt = postedAt;
+    }
+
+    public IncidentEntity(Long id, String incidentKey, String lastMsg, LocalDateTime lastUpdated, LocalDateTime postedAt, String jiraStatus) {
+        this.id = id;
+        this.incidentKey = incidentKey;
+        LastMsg = lastMsg;
+        this.lastUpdated = lastUpdated;
+        this.postedAt = postedAt;
+        this.jiraStatus = jiraStatus;
+    }
+    public IncidentEntity(){
+
     }
 }
