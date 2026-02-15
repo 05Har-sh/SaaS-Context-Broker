@@ -8,6 +8,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+
 @RestController
 @RequestMapping("/incident")
 public class IncidentController {
@@ -16,7 +19,7 @@ public class IncidentController {
      public IncidentController(IncidentService incidentService){
          this.incidentService = incidentService;
      }
-    @GetMapping("{incidentKey}")
+    @GetMapping("/{incidentKey}")
      public IncidentResponse getIncident(@PathVariable String incidentKey){
          IncidentEntity incident = incidentService.getIncidentByKey(incidentKey);
 
@@ -24,6 +27,11 @@ public class IncidentController {
          response.setIncidentKey(incident.getIncidentKey());
          response.setLastMsg(incident.getLastMsg());
          response.setLastUpdated(incident.getLastUpdated().toString());
+
+         boolean isStale = Duration
+                 .between(incident.getLastUpdated(), LocalDateTime.now())
+                 .toMinutes() > 1;
+         response.setStale(isStale);
 
          return response ;
      }

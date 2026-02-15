@@ -33,7 +33,7 @@ public class IncidentMonitor {
             //for testing purposes "minutesSinceUpdate > 1" later change it to 30
             if(minutesSinceUpdate > 1){
                 System.out.println(
-                        "⏱ STALE INCIDENT: " + incident.getIncidentKey()
+                        "⏰ STALE INCIDENT: " + incident.getIncidentKey()
                                 + " not updated for " + minutesSinceUpdate + " mins"
                 );
             }

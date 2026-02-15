@@ -4,6 +4,15 @@ public class IncidentResponse {
     private String incidentKey;
     private String lastMsg;
     private String lastUpdated;
+    private boolean stale;
+
+    public boolean isStale() {
+        return stale;
+    }
+
+    public void setStale(boolean stale) {
+        this.stale = stale;
+    }
 
     public String getIncidentKey() {
         return incidentKey;
