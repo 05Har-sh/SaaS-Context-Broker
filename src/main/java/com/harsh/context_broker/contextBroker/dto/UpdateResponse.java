@@ -2,7 +2,7 @@ package com.harsh.context_broker.contextBroker.dto;
 
 public class UpdateResponse {
     private String incidentKey;
-    private String alert;
+    private AlertResponse alert;
 
     public String getIncidentKey() {
         return incidentKey;
@@ -12,19 +12,11 @@ public class UpdateResponse {
         this.incidentKey = incidentKey;
     }
 
-    public String getAlert() {
+    public AlertResponse getAlert() {
         return alert;
     }
 
-    public void setAlert(String alert) {
+    public void setAlert(AlertResponse alert) {
         this.alert = alert;
-    }
-
-    public UpdateResponse(String incidentKey, String alert) {
-        this.incidentKey = incidentKey;
-        this.alert = alert;
-    }
-    public UpdateResponse(){
-
     }
 }

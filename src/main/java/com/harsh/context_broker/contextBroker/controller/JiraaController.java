@@ -1,5 +1,6 @@
 package com.harsh.context_broker.contextBroker.controller;
 
+import com.harsh.context_broker.contextBroker.dto.AlertResponse;
 import com.harsh.context_broker.contextBroker.dto.UpdateResponse;
 import com.harsh.context_broker.contextBroker.service.IncidentService;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +23,7 @@ public class JiraaController {
         String incidentKey = payload.get("incidentKey").toString();
         String status = payload.get("status").toString();
 
-        String alert = incidentService.handleJiraUpdate(incidentKey,  status);
+        AlertResponse alert = incidentService.handleJiraUpdate(incidentKey,  status);
 
         UpdateResponse response = new UpdateResponse();
         response.setIncidentKey(incidentKey);
