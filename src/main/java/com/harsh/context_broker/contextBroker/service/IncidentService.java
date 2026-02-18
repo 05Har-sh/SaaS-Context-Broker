@@ -4,6 +4,7 @@ import com.harsh.context_broker.contextBroker.dto.AlertResponse;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
 import com.harsh.context_broker.contextBroker.model.Severity;
 import com.harsh.context_broker.contextBroker.repository.IncidentRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -16,6 +17,18 @@ public class IncidentService {
     public IncidentService(IncidentRepository repository) {
         this.repository = repository;
     }
+    @Value("${scoring.urgent}")
+    private int urgentWeight;
+
+    @Value("${scoring.jiraOpen}")
+    private int jiraOpenWeight;
+
+    @Value("${scoring.jiraInProgress}")
+    private int jiraInProgressWeight;
+
+    @Value("${scoring.stale}")
+    private int staleWeight;
+
 
     public AlertResponse handleUpdate(String incidentKey, String message) {
         IncidentEntity incident = repository.findByIncidentKey(incidentKey)
@@ -58,19 +71,19 @@ public class IncidentService {
         int score = 0;
         String reason = "";
         if(urgent){
-            score += 50;
+            score += urgentWeight;
             reason += "Slack marked URGENT. ";
         }
         if("OPEN".equals(jiraStatus)){
-            score += 30;
+            score += jiraOpenWeight;
             reason += "Jira still OPEN. ";
         }
         if("IN_PROGRESS".equals(jiraStatus)){
-            score += 10;
+            score += jiraInProgressWeight;
             reason += "Jira IN_PROGRESS. ";
         }
         if(stale){
-            score += 20;
+            score += staleWeight;
             reason += "Incident stale for " + minutesSinceUpdate + " mins. ";
         }
         alertResponse.setScore(score);
