@@ -144,5 +144,8 @@ public class IncidentService {
         repository.save(incident);
         return alert;
     }
+    public AlertResponse evaluateSeverityPublic(IncidentEntity incident){
+        return evaluateSeverity(incident);
+    }
 }
 
