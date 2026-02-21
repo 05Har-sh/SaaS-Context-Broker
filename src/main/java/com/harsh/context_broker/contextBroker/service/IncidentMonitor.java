@@ -4,7 +4,6 @@ import com.harsh.context_broker.contextBroker.dto.AlertResponse;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
 import com.harsh.context_broker.contextBroker.model.Severity;
 import com.harsh.context_broker.contextBroker.repository.IncidentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,14 +15,16 @@ import java.util.List;
 public class IncidentMonitor {
     private final IncidentRepository incidentRepository;
     private final IncidentService incidentService;
+    private final SlackNotifier slackNotifier;
 
-    public IncidentMonitor(IncidentRepository incidentRepository, IncidentService incidentService){
+    public IncidentMonitor(IncidentRepository incidentRepository, IncidentService incidentService, SlackNotifier slackNotifier){
         this.incidentRepository = incidentRepository;
         this.incidentService = incidentService;
+        this.slackNotifier = slackNotifier;
     }
 
-    @Scheduled(fixedRate = 60000)
-    public void cmonitorIncidents(){
+    @Scheduled(fixedRate = 10000)
+    public void monitorIncidents(){
         System.out.println("👀 Monitor scanning incidents...");
 
         List<IncidentEntity> incidents = incidentRepository.findAll();
@@ -60,6 +61,28 @@ public class IncidentMonitor {
                         + alert.getScore());
 
             }
+            LocalDateTime lastEscalated = incident.getLastEscalatedAt();
+
+            boolean cooldownActive = lastEscalated != null && Duration
+                    .between(lastEscalated, LocalDateTime.now())
+                    .toMinutes() < 5;
+
+            if (cooldownActive){
+                System.out.println("Cooldown active for " + incident.getIncidentKey());
+                continue;
+            }
+            String slackMessage =  "🚨 CRITICAL INCIDENT: "
+                    + incident.getIncidentKey()
+                    + "\nScore: " + alert.getScore()
+                    + "\nReason: " + alert.getReason();
+
+            slackNotifier.sendAlert(slackMessage);
+            System.out.println( "🚨 CRITICAL INCIDENT: "
+                    + incident.getIncidentKey());
+
+            incident.setLastEscalatedAt(LocalDateTime.now());
+            incidentRepository.save(incident);
+
         }
     }
 }

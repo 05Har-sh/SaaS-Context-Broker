@@ -1,6 +1,7 @@
 package com.harsh.context_broker.contextBroker.controller;
 
 import com.harsh.context_broker.contextBroker.dto.IncidentResponse;
+import com.harsh.context_broker.contextBroker.dto.TimelineEventResponse;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
 import com.harsh.context_broker.contextBroker.service.IncidentService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/incident")
@@ -34,5 +36,10 @@ public class IncidentController {
          response.setStale(isStale);
 
          return response ;
+     }
+
+     @GetMapping("/{incidentKey}/timeline")
+     public List<TimelineEventResponse> getTimeLine(@PathVariable String incidentKey){
+         return incidentService.getTimeLine(incidentKey);
      }
 }

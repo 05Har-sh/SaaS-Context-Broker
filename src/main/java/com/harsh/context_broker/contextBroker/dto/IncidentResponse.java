@@ -5,6 +5,15 @@ public class IncidentResponse {
     private String lastMsg;
     private String lastUpdated;
     private boolean stale;
+    private String jiraStatus;
+
+    public String getJiraStatus() {
+        return jiraStatus;
+    }
+
+    public void setJiraStatus(String jiraStatus) {
+        this.jiraStatus = jiraStatus;
+    }
 
     public boolean isStale() {
         return stale;

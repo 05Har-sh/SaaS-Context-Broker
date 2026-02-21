@@ -1,21 +1,28 @@
 package com.harsh.context_broker.contextBroker.service;
 
 import com.harsh.context_broker.contextBroker.dto.AlertResponse;
+import com.harsh.context_broker.contextBroker.dto.IncidentResponse;
+import com.harsh.context_broker.contextBroker.dto.TimelineEventResponse;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
+import com.harsh.context_broker.contextBroker.entity.IncidentEventEntity;
 import com.harsh.context_broker.contextBroker.model.Severity;
+import com.harsh.context_broker.contextBroker.repository.IncidentEventRepository;
 import com.harsh.context_broker.contextBroker.repository.IncidentRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class IncidentService {
     public final IncidentRepository repository;
+    private final IncidentEventRepository eventRepository;
 
-    public IncidentService(IncidentRepository repository) {
+    public IncidentService(IncidentRepository repository, IncidentEventRepository eventRepository) {
         this.repository = repository;
+        this.eventRepository = eventRepository;
     }
     @Value("${scoring.urgent}")
     private int urgentWeight;
@@ -41,6 +48,13 @@ public class IncidentService {
         incident.setLastMsg(message);
         AlertResponse alert = evaluateSeverity(incident);
         incident.setLastUpdated(LocalDateTime.now());
+
+        IncidentEventEntity event = new IncidentEventEntity();
+        event.setIncidentKey(incidentKey);
+        event.setSource("SLACK");
+        event.setContent(message);
+        event.setTimestamp(LocalDateTime.now());
+        eventRepository.save(event);
 
         repository.save(incident);
         return alert;
@@ -96,37 +110,6 @@ public class IncidentService {
         } else{
             alertResponse.setSeverity(Severity.LOW);
         }
-
-
-// -----------------------------------old logic---------------------------------------------
-//        if (urgent) {
-//            // 🚨 RULE 1: URGENT + Jira null → Immediate Escalation
-//            if(jiraStatus == null){
-//                return "🚨ESCALATION: Slack marked URGENT but Jira has no Status yet ->" + incident.getIncidentKey();
-//            }
-//            // 🚨 RULE 2: URGENT + Jira OPEN → Immediate Escalation
-//            if("OPEN".equals(jiraStatus)){
-//                return "🚨ESCALATION: Slack marked URGENT but Jira still OPEN ->" + incident.getIncidentKey();
-//            }
-//        }
-//        // 🚨 RULE 3: URGENT + IN_PROGRESS + stale → Re-Escalation
-//        if (urgent && "IN_PROGRESS".equals(jiraStatus) && stale){
-//            return "🚨 RE-ESCALATION: Incident IN_PROGRESS but stale for "
-//                    + minutesSinceUpdate + " mins -> "
-//                    + incident.getIncidentKey();
-//        }
-
-
-//--------------------------------debug-----------------------------------------------------------
-//        System.out.println("--------Alert debug-------");
-//        System.out.println("message"+message);
-//        System.out.println("jira status = "+ jiraStatus);
-//        System.out.println("urgent = "+urgent);
-//        System.out.println("minutes = "+minutesSinceUpdate);
-//        System.out.println("stale = "+stale);
-//        System.out.println("---------------------------");
-
-
         return alertResponse;
     }
 
@@ -139,6 +122,14 @@ public class IncidentService {
                     return i;
                 });
         incident.setJiraStatus(status);
+
+        IncidentEventEntity event = new IncidentEventEntity();
+        event.setIncidentKey(incidentKey);
+        event.setSource("JIRA");
+        event.setContent("Status changed to " + status);
+        event.setTimestamp(LocalDateTime.now());
+        eventRepository.save(event);
+
         AlertResponse alert = evaluateSeverity(incident);
         incident.setLastUpdated(LocalDateTime.now());
         repository.save(incident);
@@ -146,6 +137,43 @@ public class IncidentService {
     }
     public AlertResponse evaluateSeverityPublic(IncidentEntity incident){
         return evaluateSeverity(incident);
+    }
+
+    public List<IncidentResponse> getAllIncidents() {
+
+        List<IncidentEntity> incidents = repository.findAll();
+
+        return incidents.stream().map(incident -> {
+
+            IncidentResponse response = new IncidentResponse();
+            response.setIncidentKey(incident.getIncidentKey());
+            response.setLastMsg(incident.getLastMsg());
+            response.setJiraStatus(incident.getJiraStatus());
+
+            if (incident.getLastUpdated() != null) {
+                response.setLastUpdated(incident.getLastUpdated().toString());
+
+                boolean stale = Duration
+                        .between(incident.getLastUpdated(), LocalDateTime.now())
+                        .toMinutes() >= 1;
+
+                response.setStale(stale);
+            }
+
+            return response;
+
+        }).toList();
+    }
+
+    public List<TimelineEventResponse> getTimeLine(String incidentKey){
+        List<IncidentEventEntity> events = eventRepository.findByIncidentKeyOrderByTimestampAsc(incidentKey);
+         return events.stream().map(event ->{
+             TimelineEventResponse dto = new TimelineEventResponse();
+             dto.setSource(event.getSource());
+             dto.setContent(event.getContent());
+             dto.setTimeStamp(event.getTimestamp());
+             return dto;
+         }).toList();
     }
 }
 

@@ -17,6 +17,15 @@ public class IncidentEntity {
     private LocalDateTime lastUpdated;
     private LocalDateTime postedAt;
     private String jiraStatus;
+    private LocalDateTime lastEscalatedAt;
+
+    public LocalDateTime getLastEscalatedAt() {
+        return lastEscalatedAt;
+    }
+
+    public void setLastEscalatedAt(LocalDateTime lastEscalatedAt) {
+        this.lastEscalatedAt = lastEscalatedAt;
+    }
 
     public String getJiraStatus() {
         return jiraStatus;
