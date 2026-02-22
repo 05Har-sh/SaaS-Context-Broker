@@ -7,4 +7,9 @@ import java.util.Optional;
 
 public interface IncidentRepository extends JpaRepository<IncidentEntity, Long> {
     Optional<IncidentEntity> findByIncidentKey(String incidentKey);
+    long count();
+
+    long countBySeverity(String severity);
+
+    long countByJiraStatusNot(String status);
 }

@@ -1,8 +1,7 @@
 package com.harsh.context_broker.contextBroker.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
+import com.harsh.context_broker.contextBroker.model.Severity;
+import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
@@ -18,6 +17,17 @@ public class IncidentEntity {
     private LocalDateTime postedAt;
     private String jiraStatus;
     private LocalDateTime lastEscalatedAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "severity")
+    private Severity severity;
+
+    public Severity getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(Severity severity) {
+        this.severity = severity;
+    }
 
     public LocalDateTime getLastEscalatedAt() {
         return lastEscalatedAt;
@@ -75,13 +85,14 @@ public class IncidentEntity {
         this.postedAt = postedAt;
     }
 
-    public IncidentEntity(Long id, String incidentKey, String lastMsg, LocalDateTime lastUpdated, LocalDateTime postedAt, String jiraStatus) {
+    public IncidentEntity(Long id, String incidentKey, String lastMsg, LocalDateTime lastUpdated, LocalDateTime postedAt, String jiraStatus, Severity severity) {
         this.id = id;
         this.incidentKey = incidentKey;
         LastMsg = lastMsg;
         this.lastUpdated = lastUpdated;
         this.postedAt = postedAt;
         this.jiraStatus = jiraStatus;
+        this.severity = severity;
     }
     public IncidentEntity(){
 
