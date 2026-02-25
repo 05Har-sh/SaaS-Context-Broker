@@ -3,6 +3,7 @@ package com.harsh.context_broker.contextBroker.controller;
 import com.harsh.context_broker.contextBroker.dto.*;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
 import com.harsh.context_broker.contextBroker.service.IncidentService;
+import com.harsh.context_broker.contextBroker.service.TimelineService;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -14,9 +15,11 @@ import java.util.List;
 @CrossOrigin(origins = "http://localhost:3000")
 public class IncidentController {
     private final IncidentService incidentService;
+    private final TimelineService timelineService;
 
-     public IncidentController(IncidentService incidentService){
+     public IncidentController(IncidentService incidentService, TimelineService timelineService){
          this.incidentService = incidentService;
+         this.timelineService = timelineService;
      }
     @GetMapping("/{incidentKey}")
      public IncidentResponse getIncidentDetails(@PathVariable String incidentKey){
@@ -37,7 +40,7 @@ public class IncidentController {
 
      @GetMapping("/{incidentKey}/timeline")
      public List<TimelineEventResponse> getTimeLine(@PathVariable String incidentKey){
-         return incidentService.getTimeLine(incidentKey);
+         return timelineService.getTimelineForIncident(incidentKey);
      }
 
          @GetMapping("/incident-details/{incidentKey}")

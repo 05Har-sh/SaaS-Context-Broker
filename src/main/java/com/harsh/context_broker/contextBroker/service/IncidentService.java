@@ -12,15 +12,21 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class IncidentService {
     public final IncidentRepository repository;
     private final IncidentEventRepository eventRepository;
+    private final SlackNotifier slackNotifier;
+    private final TimelineService timelineService;
+    public static final long ALERT_COOLDOWN_MINUTES = 10;
 
-    public IncidentService(IncidentRepository repository, IncidentEventRepository eventRepository) {
+    public IncidentService(IncidentRepository repository,TimelineService timelineService, IncidentEventRepository eventRepository, SlackNotifier slackNotifier) {
         this.repository = repository;
         this.eventRepository = eventRepository;
+        this.slackNotifier = slackNotifier;
+        this.timelineService = timelineService;
     }
     @Value("${scoring.urgent}")
     private int urgentWeight;
@@ -36,17 +42,41 @@ public class IncidentService {
 
 
     public AlertResponse handleUpdate(String incidentKey, String message) {
+        AtomicBoolean isNew = new AtomicBoolean(false);
         IncidentEntity incident = repository.findByIncidentKey(incidentKey)
                 .orElseGet(() -> {
+                    isNew.set(true);
                     IncidentEntity i = new IncidentEntity();
                     i.setIncidentKey(incidentKey);
                     i.setPostedAt(LocalDateTime.now());
+                    i.setLastUpdated(LocalDateTime.now());
                     return i;
                 });
+        if (isNew.get()) {
+            timelineService.logEvent(
+                    incidentKey,
+                    "CREATED",
+                    "Incident created via Slack update"
+            );
+        }
         incident.setLastMsg(message);
-        AlertResponse alert = evaluateSeverity(incident);
+        timelineService.logEvent(
+                incidentKey,
+                "MESSAGE_RECEIVED",
+                "Slack message: " + message
+        );
         incident.setLastUpdated(LocalDateTime.now());
-
+        AlertResponse alert = evaluateSeverity(incident);
+        if (alert != null) {
+            timelineService.logEvent(
+                    incidentKey,
+                    "SEVERITY_EVALUATED",
+                    "Score: " + alert.getScore()
+                            + ", Severity: "
+                            + alert.getSeverity()
+            );
+        }
+        
         IncidentEventEntity event = new IncidentEventEntity();
         event.setIncidentKey(incidentKey);
         event.setSource("SLACK");
@@ -65,12 +95,14 @@ public class IncidentService {
 
     private AlertResponse evaluateSeverity(IncidentEntity incident) {
 
+        Severity previousSeverity = incident.getSeverity();
+
         String message = incident.getLastMsg();
         String jiraStatus = incident.getJiraStatus();
         LocalDateTime lastUpdated = incident.getLastUpdated();
 
         if(lastUpdated == null){
-            return null;
+            incident.setLastUpdated(LocalDateTime.now());
         }
         boolean urgent = message != null && message.contains("URGENT");
 
@@ -82,6 +114,7 @@ public class IncidentService {
         AlertResponse alertResponse = new AlertResponse();
         int score = 0;
         String reason = "";
+
         if(urgent){
             score += urgentWeight;
             reason += "Slack marked URGENT. ";
@@ -108,6 +141,50 @@ public class IncidentService {
         } else{
             alertResponse.setSeverity(Severity.LOW);
         }
+
+        Severity newSeverity = alertResponse.getSeverity();
+        incident.setSeverity(newSeverity);
+
+        // ✅ Timeline → Severity evaluated
+        timelineService.logEvent(
+                incident.getIncidentKey(),
+                "SEVERITY_EVALUATED",
+                "Score: " + score + ", Severity: " + newSeverity
+        );
+
+        // ✅ Timeline → Severity changed
+        if (previousSeverity != newSeverity) {
+            timelineService.logEvent(
+                    incident.getIncidentKey(),
+                    "SEVERITY_CHANGED",
+                    "Severity changed from "
+                            + previousSeverity
+                            + " → "
+                            + newSeverity
+            );
+        }
+
+        if((newSeverity == Severity.HIGH || newSeverity == Severity.CRITICAL)
+                && canSendAlert(incident)){
+            slackNotifier.sendAlert(incident, alertResponse);
+            incident.setLastAlertedAt(LocalDateTime.now());
+
+            timelineService.logEvent(
+                    incident.getIncidentKey(),
+                    "ALERT_SENT",
+                    "Slack alert triggered. Severity: "
+                            + newSeverity
+                            + ", Score: "
+                            + score
+            );
+        } else {
+            timelineService.logEvent(
+                    incident.getIncidentKey(),
+                    "ALERT_SKIPPED",
+                    "Cooldown active. Alert suppressed for severity " + newSeverity
+            );
+        }
+
         return alertResponse;
     }
 
@@ -312,6 +389,10 @@ public class IncidentService {
         return response;
     }
 
-
+    public boolean canSendAlert(IncidentEntity incident){
+        if(incident.getLastAlertedAt() == null) return true;
+        LocalDateTime nextAllowed = incident.getLastAlertedAt().plusMinutes(ALERT_COOLDOWN_MINUTES);
+        return LocalDateTime.now().isAfter(nextAllowed);
+    }
 }
 

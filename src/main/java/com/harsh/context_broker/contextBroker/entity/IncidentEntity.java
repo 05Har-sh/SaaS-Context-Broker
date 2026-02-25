@@ -17,9 +17,18 @@ public class IncidentEntity {
     private LocalDateTime postedAt;
     private String jiraStatus;
     private LocalDateTime lastEscalatedAt;
+    private LocalDateTime lastAlertedAt;
     @Enumerated(EnumType.STRING)
     @Column(name = "severity")
     private Severity severity;
+
+    public LocalDateTime getLastAlertedAt() {
+        return lastAlertedAt;
+    }
+
+    public void setLastAlertedAt(LocalDateTime lastAlertedAt) {
+        this.lastAlertedAt = lastAlertedAt;
+    }
 
     public Severity getSeverity() {
         return severity;
@@ -85,14 +94,15 @@ public class IncidentEntity {
         this.postedAt = postedAt;
     }
 
-    public IncidentEntity(Long id, String incidentKey, String lastMsg, LocalDateTime lastUpdated, LocalDateTime postedAt, String jiraStatus, Severity severity) {
+    public IncidentEntity(Long id, String incidentKey, String lastMsg, LocalDateTime lastUpdated, LocalDateTime postedAt, String jiraStatus, Severity severity, LocalDateTime lastAlertedAt) {
         this.id = id;
         this.incidentKey = incidentKey;
-        LastMsg = lastMsg;
+        this.LastMsg = lastMsg;
         this.lastUpdated = lastUpdated;
         this.postedAt = postedAt;
         this.jiraStatus = jiraStatus;
         this.severity = severity;
+        this.lastAlertedAt = lastAlertedAt;
     }
     public IncidentEntity(){
 

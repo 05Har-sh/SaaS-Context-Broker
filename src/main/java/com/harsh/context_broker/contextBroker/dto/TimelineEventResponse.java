@@ -6,6 +6,25 @@ public class TimelineEventResponse {
 
     private String source;
     private String content;
+    private String eventType;
+    private String description;
+
+    public String getEventType() {
+        return eventType;
+    }
+
+    public void setEventType(String eventType) {
+        this.eventType = eventType;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
     private LocalDateTime timeStamp;
 
     public String getSource() {
@@ -32,10 +51,12 @@ public class TimelineEventResponse {
         this.timeStamp = timeStamp;
     }
 
-    public TimelineEventResponse(String source, String content, LocalDateTime timeStamp) {
+    public TimelineEventResponse(String source, String content,String eventType,String description, LocalDateTime timeStamp) {
         this.source = source;
         this.content = content;
         this.timeStamp = timeStamp;
+        this.eventType = eventType;
+        this.description = description;
     }
     public TimelineEventResponse(){
 
