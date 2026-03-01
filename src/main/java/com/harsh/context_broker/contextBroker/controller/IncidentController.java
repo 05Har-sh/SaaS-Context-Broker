@@ -73,6 +73,21 @@ public class IncidentController {
         return incidentService.getPriority(incidentKey);
     }
 
+    @GetMapping("/highest-risk")
+    public HighestRiskResponse getHighestRisk() {
+        return incidentService.getHighestRisk();
+    }
+
+    @GetMapping("/severity-distribution")
+    public List<SeverityDistributionResponse> getSeverityDistribution() {
+        return incidentService.getSeverityDistribution();
+    }
+
+    @GetMapping("/trend")
+    public List<TrendResponse> getTrend() {
+        return incidentService.getTrend();
+    }
+
 //    @GetMapping("/search")
 //    public List<IncidentResponse> search(@RequestParam String q) {
 //        return incidentService.searchIncidents(q);

@@ -10,9 +10,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 @Service
 public class IncidentService {
@@ -311,24 +316,25 @@ public class IncidentService {
 
     public SystemHealthResponse getSystemHealth() {
 
-        List<IncidentEntity> incidents = repository.findAll();
-
-        long total = incidents.size();
-        long stale = incidents.stream().filter(this::isStale).count();
-        long critical = incidents.stream()
-                .filter(i -> Severity.CRITICAL.equals(i.getSeverity()))
-                .count();
-
-        String status = "HEALTHY";
-
-        if (critical > 0) status = "CRITICAL";
-        else if (stale > 2) status = "WARNING";
+        MetricsResponse metrics = getMetrics();
 
         SystemHealthResponse response = new SystemHealthResponse();
-        response.setStatus(status);
-        response.setTotalIncidents(total);
-        response.setStaleIncidents(stale);
-        response.setCriticalIncidents(critical);
+
+        if (metrics.getCritical() > 5) {
+            response.setStatus("CRITICAL");
+            response.setScore(40);
+            response.setReasons(List.of("High number of critical incidents"));
+        }
+        else if (metrics.getStale() > 10) {
+            response.setStatus("DEGRADED");
+            response.setScore(70);
+            response.setReasons(List.of("Many stale incidents"));
+        }
+        else {
+            response.setStatus("HEALTHY");
+            response.setScore(95);
+            response.setReasons(List.of("System operating normally"));
+        }
 
         return response;
     }
@@ -394,5 +400,127 @@ public class IncidentService {
         LocalDateTime nextAllowed = incident.getLastAlertedAt().plusMinutes(ALERT_COOLDOWN_MINUTES);
         return LocalDateTime.now().isAfter(nextAllowed);
     }
+
+    public HighestRiskResponse getHighestRisk() {
+
+        List<IncidentEntity> incidents = repository.findAll();
+
+        IncidentEntity highest = incidents.stream()
+                .max(Comparator.comparingInt(this::calculateRiskScore))
+                .orElse(null);
+
+        if (highest == null) return null;
+
+        HighestRiskResponse response = new HighestRiskResponse();
+        response.setIncidentKey(highest.getIncidentKey());
+        response.setRiskScore(calculateRiskScore(highest));
+
+        return response;
+    }
+
+    private int calculateRiskScore(IncidentEntity incident) {
+
+        if (incident == null) return 0;
+
+        int score = 0;
+
+        String message = incident.getLastMsg();
+        String jiraStatus = incident.getJiraStatus();
+        LocalDateTime lastUpdated = incident.getLastUpdated();
+
+        // 🔴 Slack urgency
+        if (message != null && message.contains("URGENT")) {
+            score += urgentWeight; // e.g. 50
+        }
+
+        // 🟡 Jira status weighting
+        if ("OPEN".equals(jiraStatus)) {
+            score += jiraOpenWeight; // e.g. 30
+        }
+        else if ("IN_PROGRESS".equals(jiraStatus)) {
+            score += jiraInProgressWeight; // e.g. 10
+        }
+
+        // ⏱ Staleness factor
+        if (lastUpdated != null) {
+
+            long minutes = Duration
+                    .between(lastUpdated, LocalDateTime.now())
+                    .toMinutes();
+
+            if (minutes >= 60) {          // 1 hour stale
+                score += staleWeight;     // e.g. 20
+            }
+
+            // 🔥 Progressive escalation (optional realism)
+            if (minutes >= 180) {         // 3 hours
+                score += 10;
+            }
+
+            if (minutes >= 360) {         // 6 hours
+                score += 20;
+            }
+        }
+
+        // 🔥 Severity reinforcement (if already computed)
+        if (incident.getSeverity() == Severity.CRITICAL) {
+            score += 20;
+        }
+        else if (incident.getSeverity() == Severity.HIGH) {
+            score += 10;
+        }
+
+        return Math.min(score, 100); // cap at 100
+    }
+
+    public List<SeverityDistributionResponse> getSeverityDistribution() {
+
+        return repository.findAll().stream()
+                .collect(Collectors.groupingBy(
+                        IncidentEntity::getSeverity,
+                        Collectors.counting()
+                ))
+                .entrySet().stream()
+                .map(entry -> {
+                    SeverityDistributionResponse r = new SeverityDistributionResponse();
+                    r.setSeverity(entry.getKey().name());
+                    r.setCount(entry.getValue().intValue());
+                    return r;
+                })
+                .toList();
+    }
+
+    public List<TrendResponse> getTrend() {
+
+        LocalDate today = LocalDate.now();
+        LocalDate sevenDaysAgo = today.minusDays(6);
+
+        // Group incidents by date
+        Map<LocalDate, Long> grouped = repository.findAll().stream()
+                .filter(i -> i.getPostedAt() != null)
+                .map(i -> i.getPostedAt().toLocalDate())
+                .filter(date -> !date.isBefore(sevenDaysAgo))
+                .collect(Collectors.groupingBy(
+                        date -> date,
+                        Collectors.counting()
+                ));
+
+        List<TrendResponse> result = new ArrayList<>();
+
+        // Ensure all 7 days are present
+        for (int i = 0; i < 7; i++) {
+            LocalDate date = sevenDaysAgo.plusDays(i);
+
+            TrendResponse response = new TrendResponse();
+            response.setDate(date.toString());
+            response.setCount(grouped.getOrDefault(date, 0L).intValue());
+
+            result.add(response);
+        }
+
+        return result;
+    }
+
+
 }
 

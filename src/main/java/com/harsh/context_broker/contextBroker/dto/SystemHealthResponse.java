@@ -1,10 +1,21 @@
 package com.harsh.context_broker.contextBroker.dto;
 
+import java.util.List;
+
 public class SystemHealthResponse {
-    private String status;      // HEALTHY / WARNING / CRITICAL
-    private long totalIncidents;
-    private long staleIncidents;
-    private long criticalIncidents;
+
+    private String status;     // HEALTHY / DEGRADED / CRITICAL
+    private int score;         // 0 - 100 health score
+    private List<String> reasons;
+
+    public SystemHealthResponse() {
+    }
+
+    public SystemHealthResponse(String status, int score, List<String> reasons) {
+        this.status = status;
+        this.score = score;
+        this.reasons = reasons;
+    }
 
     public String getStatus() {
         return status;
@@ -14,37 +25,19 @@ public class SystemHealthResponse {
         this.status = status;
     }
 
-    public long getTotalIncidents() {
-        return totalIncidents;
+    public int getScore() {
+        return score;
     }
 
-    public void setTotalIncidents(long totalIncidents) {
-        this.totalIncidents = totalIncidents;
+    public void setScore(int score) {
+        this.score = score;
     }
 
-    public long getStaleIncidents() {
-        return staleIncidents;
+    public List<String> getReasons() {
+        return reasons;
     }
 
-    public void setStaleIncidents(long staleIncidents) {
-        this.staleIncidents = staleIncidents;
-    }
-
-    public long getCriticalIncidents() {
-        return criticalIncidents;
-    }
-
-    public void setCriticalIncidents(long criticalIncidents) {
-        this.criticalIncidents = criticalIncidents;
-    }
-
-    public SystemHealthResponse(String status, long totalIncidents, long staleIncidents, long criticalIncidents) {
-        this.status = status;
-        this.totalIncidents = totalIncidents;
-        this.staleIncidents = staleIncidents;
-        this.criticalIncidents = criticalIncidents;
-    }
-    public SystemHealthResponse(){
-
+    public void setReasons(List<String> reasons) {
+        this.reasons = reasons;
     }
 }
