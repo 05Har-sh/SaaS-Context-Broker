@@ -28,7 +28,6 @@ public class TimelineService {
         repository.save(event);
     }
 
-    // ✅ THIS is what was missing
     public List<TimelineEventResponse> getTimelineForIncident(String incidentKey) {
 
         return repository.findByIncidentKeyOrderByTimestampDesc(incidentKey)

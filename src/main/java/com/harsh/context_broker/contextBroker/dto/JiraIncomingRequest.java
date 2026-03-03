@@ -1,14 +1,18 @@
 package com.harsh.context_broker.contextBroker.dto;
+import com.harsh.context_broker.contextBroker.model.JiraStatus;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public class JiraIncomingRequest {
     @NotBlank(message = "Incident key must not be blank")
     private String incidentKey;
 
-    @NotBlank(message = "Status must not be blank ")
-    private String status;
+    @NotNull(message = "Status must not be null ")
+    private JiraStatus status;
 
-    public JiraIncomingRequest(String incidentKey, String status) {
+    public JiraIncomingRequest(String incidentKey, JiraStatus status) {
         this.incidentKey = incidentKey;
         this.status = status;
     }
@@ -22,11 +26,11 @@ public class JiraIncomingRequest {
         this.incidentKey = incidentKey;
     }
 
-    public @NotBlank(message = "Status must not be blank ") String getStatus() {
+    public @NotBlank(message = "Status must not be blank ") JiraStatus getStatus() {
         return status;
     }
 
-    public void setStatus(@NotBlank(message = "Status must not be blank ") String status) {
+    public void setStatus(@NotBlank(message = "Status must not be blank ") JiraStatus status) {
         this.status = status;
     }
 
