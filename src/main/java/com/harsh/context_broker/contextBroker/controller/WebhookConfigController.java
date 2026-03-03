@@ -1,6 +1,9 @@
 package com.harsh.context_broker.contextBroker.controller;
 
+import com.harsh.context_broker.contextBroker.dto.ApiSuccessResponse;
+import com.harsh.context_broker.contextBroker.dto.WebhookConfigRequest;
 import com.harsh.context_broker.contextBroker.service.WebhookConfigService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,9 +20,9 @@ public class WebhookConfigController {
         this.service = service;
     }
     @PostMapping("/slack")
-    public String saveWebhook(@RequestBody Map<String, String> body){
-        String url = body.get("webhookUrl");
-        service.saveWebhook(url);
-        return "✅ Slack webhook saved";
+    public ApiSuccessResponse saveWebhook(@Valid @RequestBody WebhookConfigRequest request){
+
+        service.saveWebhook(request.getWebhookUrl());
+        return new ApiSuccessResponse("Slack Webhook saved succesfully");
     }
 }

@@ -95,7 +95,7 @@ public class IncidentService {
 
     public IncidentEntity getIncidentByKey(String incidentKey) {
         return repository.findByIncidentKey(incidentKey)
-                .orElseThrow(() -> new RuntimeException("Incident not found"));
+                .orElseThrow(() -> new RuntimeException("Incident not found" + incidentKey));
     }
 
     private AlertResponse evaluateSeverity(IncidentEntity incident) {
