@@ -1,5 +1,6 @@
 package com.harsh.context_broker.contextBroker.entity;
 
+import com.harsh.context_broker.contextBroker.model.JiraStatus;
 import com.harsh.context_broker.contextBroker.model.Severity;
 import jakarta.persistence.*;
 
@@ -15,7 +16,9 @@ public class IncidentEntity {
     private String LastMsg;
     private LocalDateTime lastUpdated;
     private LocalDateTime postedAt;
-    private String jiraStatus;
+
+    @Enumerated(EnumType.STRING)
+    private JiraStatus jiraStatus;
     private LocalDateTime lastEscalatedAt;
     private LocalDateTime lastAlertedAt;
     @Enumerated(EnumType.STRING)
@@ -44,14 +47,6 @@ public class IncidentEntity {
 
     public void setLastEscalatedAt(LocalDateTime lastEscalatedAt) {
         this.lastEscalatedAt = lastEscalatedAt;
-    }
-
-    public String getJiraStatus() {
-        return jiraStatus;
-    }
-
-    public void setJiraStatus(String jiraStatus) {
-        this.jiraStatus = jiraStatus;
     }
 
     public Long getId() {
@@ -94,14 +89,22 @@ public class IncidentEntity {
         this.postedAt = postedAt;
     }
 
-    public IncidentEntity(Long id, String incidentKey, String lastMsg, LocalDateTime lastUpdated, LocalDateTime postedAt, String jiraStatus, Severity severity, LocalDateTime lastAlertedAt) {
+    public JiraStatus getJiraStatus() {
+        return jiraStatus;
+    }
+
+    public void setJiraStatus(JiraStatus jiraStatus) {
+        this.jiraStatus = jiraStatus;
+    }
+
+    public IncidentEntity(Long id, String incidentKey, JiraStatus jiraStatus, String lastMsg, LocalDateTime lastUpdated, LocalDateTime postedAt, Severity severity, LocalDateTime lastAlertedAt) {
         this.id = id;
         this.incidentKey = incidentKey;
         this.LastMsg = lastMsg;
         this.lastUpdated = lastUpdated;
         this.postedAt = postedAt;
-        this.jiraStatus = jiraStatus;
         this.severity = severity;
+        this.jiraStatus = jiraStatus;
         this.lastAlertedAt = lastAlertedAt;
     }
     public IncidentEntity(){
