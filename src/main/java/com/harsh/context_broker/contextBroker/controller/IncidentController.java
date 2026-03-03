@@ -28,8 +28,9 @@ public class IncidentController {
          IncidentResponse response = new IncidentResponse();
          response.setIncidentKey(incident.getIncidentKey());
          response.setLastMsg(incident.getLastMsg());
-         response.setLastUpdated(incident.getLastUpdated().toString());
-
+        if (incident.getLastUpdated() != null) {
+            response.setLastUpdated(incident.getLastUpdated().toString());
+        }
          boolean isStale = Duration
                  .between(incident.getLastUpdated(), LocalDateTime.now())
                  .toMinutes() > 1;
