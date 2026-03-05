@@ -3,6 +3,7 @@ package com.harsh.context_broker.contextBroker.service;
 import com.harsh.context_broker.contextBroker.dto.*;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
 import com.harsh.context_broker.contextBroker.entity.IncidentEventEntity;
+import com.harsh.context_broker.contextBroker.model.JiraStatus;
 import com.harsh.context_broker.contextBroker.model.Severity;
 import com.harsh.context_broker.contextBroker.repository.IncidentEventRepository;
 import com.harsh.context_broker.contextBroker.repository.IncidentRepository;
@@ -95,7 +96,7 @@ public class IncidentService {
 
     public IncidentEntity getIncidentByKey(String incidentKey) {
         return repository.findByIncidentKey(incidentKey)
-                .orElseThrow(() -> new RuntimeException("Incident not found"));
+                .orElseThrow(() -> new RuntimeException("Incident not found" + incidentKey));
     }
 
     private AlertResponse evaluateSeverity(IncidentEntity incident) {
@@ -103,7 +104,7 @@ public class IncidentService {
         Severity previousSeverity = incident.getSeverity();
 
         String message = incident.getLastMsg();
-        String jiraStatus = incident.getJiraStatus();
+
         LocalDateTime lastUpdated = incident.getLastUpdated();
 
         if(lastUpdated == null){
@@ -124,11 +125,11 @@ public class IncidentService {
             score += urgentWeight;
             reason += "Slack marked URGENT. ";
         }
-        if("OPEN".equals(jiraStatus)){
+        if(incident.getJiraStatus() == JiraStatus.OPEN){
             score += jiraOpenWeight;
             reason += "Jira still OPEN. ";
         }
-        if("IN_PROGRESS".equals(jiraStatus)){
+        if(incident.getJiraStatus() == JiraStatus.IN_PROGRESS){
             score += jiraInProgressWeight;
             reason += "Jira IN_PROGRESS. ";
         }
@@ -193,7 +194,7 @@ public class IncidentService {
         return alertResponse;
     }
 
-    public AlertResponse handleJiraUpdate(String incidentKey, String status){
+    public AlertResponse handleJiraUpdate(String incidentKey, JiraStatus status){
         IncidentEntity incident = repository.findByIncidentKey(incidentKey)
                 .orElseGet(()->{
                     IncidentEntity i = new IncidentEntity();
@@ -228,7 +229,9 @@ public class IncidentService {
             IncidentResponse response = new IncidentResponse();
             response.setIncidentKey(incident.getIncidentKey());
             response.setLastMsg(incident.getLastMsg());
-            response.setJiraStatus(incident.getJiraStatus());
+            response.setJiraStatus(incident.getJiraStatus() != null
+                    ? incident.getJiraStatus().name()
+                    : null);
 
             if (incident.getLastUpdated() != null) {
                 response.setLastUpdated(incident.getLastUpdated().toString());
@@ -263,7 +266,9 @@ public class IncidentService {
         IncidentDetailsResponse dto = new IncidentDetailsResponse();
         dto.setIncidentKey(incident.getIncidentKey());
         dto.setLastMsg(incident.getLastMsg());
-        dto.setJiraStatus(incident.getJiraStatus());
+        dto.setJiraStatus(incident.getJiraStatus() != null
+                ? incident.getJiraStatus().name()
+                : null);
         dto.setSeverity(alert.getSeverity().name());
         dto.setLastUpdated(
                 incident.getLastUpdated() != null
@@ -283,7 +288,7 @@ public class IncidentService {
 
         long total = incidents.size();
         long active = incidents.stream()
-                .filter(i -> !"RESOLVED".equals(i.getJiraStatus()))
+                .filter(i -> i.getJiraStatus() != JiraStatus.RESOLVED)
                 .count();
 
         long critical = incidents.stream()
@@ -351,7 +356,7 @@ public class IncidentService {
             reason += "URGENT detected. ";
         }
 
-        if ("OPEN".equals(incident.getJiraStatus())) {
+        if (incident.getJiraStatus() == JiraStatus.OPEN) {
             score += 30;
             reason += "Jira OPEN. ";
         }
@@ -425,7 +430,6 @@ public class IncidentService {
         int score = 0;
 
         String message = incident.getLastMsg();
-        String jiraStatus = incident.getJiraStatus();
         LocalDateTime lastUpdated = incident.getLastUpdated();
 
         // 🔴 Slack urgency
@@ -434,10 +438,10 @@ public class IncidentService {
         }
 
         // 🟡 Jira status weighting
-        if ("OPEN".equals(jiraStatus)) {
+        if (incident.getJiraStatus() == JiraStatus.OPEN) {
             score += jiraOpenWeight; // e.g. 30
         }
-        else if ("IN_PROGRESS".equals(jiraStatus)) {
+        else if (incident.getJiraStatus() == JiraStatus.IN_PROGRESS) {
             score += jiraInProgressWeight; // e.g. 10
         }
 

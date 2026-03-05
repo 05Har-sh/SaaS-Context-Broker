@@ -1,8 +1,10 @@
 package com.harsh.context_broker.contextBroker.controller;
 
 import com.harsh.context_broker.contextBroker.dto.AlertResponse;
+import com.harsh.context_broker.contextBroker.dto.SlackIncomingRequest;
 import com.harsh.context_broker.contextBroker.dto.UpdateResponse;
 import com.harsh.context_broker.contextBroker.service.IncidentService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,13 +21,12 @@ public class SlackController {
         this.incidentService = incidentService;
     }
     @PostMapping("/slack")
-    public UpdateResponse recieveSlack(@RequestBody Map<String, Object> payload){
-        String incidentKey = payload.get("incidentKey").toString();
-        String message = payload.get("message").toString();
-        AlertResponse alert = incidentService.handleUpdate(incidentKey, message);
+    public UpdateResponse recieveSlack(@Valid @RequestBody SlackIncomingRequest request){
+
+        AlertResponse alert = incidentService.handleUpdate(request.getIncidentKey(), request.getMessage());
 
         UpdateResponse response = new UpdateResponse();
-        response.setIncidentKey(incidentKey);
+        response.setIncidentKey(request.getIncidentKey());
         response.setAlert(alert);
 
         return response;
