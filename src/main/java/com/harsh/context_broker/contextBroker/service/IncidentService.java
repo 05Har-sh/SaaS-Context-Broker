@@ -3,6 +3,7 @@ package com.harsh.context_broker.contextBroker.service;
 import com.harsh.context_broker.contextBroker.dto.*;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
 import com.harsh.context_broker.contextBroker.entity.IncidentEventEntity;
+import com.harsh.context_broker.contextBroker.exception.ResourceNotFoundException;
 import com.harsh.context_broker.contextBroker.model.JiraStatus;
 import com.harsh.context_broker.contextBroker.model.Severity;
 import com.harsh.context_broker.contextBroker.repository.IncidentEventRepository;
@@ -254,6 +255,14 @@ public class IncidentService {
 
                 response.setStale(stale);
             }
+            int riskScore = calculateRiskScore(incident);
+            response.setRiskScore(riskScore);
+
+            response.setSeverity(
+                    incident.getSeverity() != null
+                            ? incident.getSeverity()
+                            : Severity.LOW
+            );
 
             return response;
         });
@@ -537,5 +546,32 @@ public class IncidentService {
     }
 
 
+    public void assignIncident(String incidentKey, String assignedTo) {
+        IncidentEntity incident = repository.findByIncidentKey(incidentKey)
+                .orElseThrow(() ->new ResourceNotFoundException("Incident not found: " + incidentKey));
+        String previousAssignee = incident.getAssignedTo();
+
+        if(assignedTo.equalsIgnoreCase(previousAssignee)){
+            return;//no change
+        }
+
+        incident.setAssignedTo(assignedTo);
+        incident.setLastUpdated(LocalDateTime.now());
+        repository.save(incident);
+
+        if(previousAssignee == null){
+            timelineService.logEvent(
+                    incidentKey,
+                    "ASSIGNED",
+                    "Assigned to " + assignedTo
+            );
+        }else {
+            timelineService.logEvent(
+                    incidentKey,
+                    "REASSIGNED",
+                    "Reassigned from " + previousAssignee + " to " + assignedTo
+            );
+        }
+    }
 }
 

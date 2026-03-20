@@ -4,6 +4,7 @@ import com.harsh.context_broker.contextBroker.dto.*;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
 import com.harsh.context_broker.contextBroker.service.IncidentService;
 import com.harsh.context_broker.contextBroker.service.TimelineService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
@@ -56,10 +57,11 @@ public class IncidentController {
      }
 
     @GetMapping("/all")
-    public Page<IncidentResponse> getAllIncidents(@RequestParam(defaultValue = "0") int page,
-                                                  @RequestParam(defaultValue = "10") int size,
-                                                  @RequestParam(defaultValue = "lastUpdated") String sortBy,
-                                                  @RequestParam(defaultValue = "desc") String direction) {
+    public Page<IncidentResponse> getAllIncidents(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "lastUpdated") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction) {
         return incidentService.getAllIncidents(page, size, sortBy, direction);
     }
 
@@ -91,6 +93,14 @@ public class IncidentController {
     @GetMapping("/trend")
     public List<TrendResponse> getTrend() {
         return incidentService.getTrend();
+    }
+
+    @PostMapping("/{incidentKey}/assign")
+    public ApiSuccessResponse assignIncident(
+            @PathVariable String incidentKey,
+            @Valid @RequestBody AssignRequest request){
+         incidentService.assignIncident(incidentKey, request.getAssignedTo());
+         return new ApiSuccessResponse("Incident assigned successfully");
     }
 
 //    @GetMapping("/search")
