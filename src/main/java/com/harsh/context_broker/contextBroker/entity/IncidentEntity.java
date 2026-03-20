@@ -25,6 +25,16 @@ public class IncidentEntity {
     @Column(name = "severity")
     private Severity severity;
 
+    private String assignedTo;
+
+    public String getAssignedTo() {
+        return assignedTo;
+    }
+
+    public void setAssignedTo(String assignedTo) {
+        this.assignedTo = assignedTo;
+    }
+
     public LocalDateTime getLastAlertedAt() {
         return lastAlertedAt;
     }
@@ -97,7 +107,7 @@ public class IncidentEntity {
         this.jiraStatus = jiraStatus;
     }
 
-    public IncidentEntity(Long id, String incidentKey, JiraStatus jiraStatus, String lastMsg, LocalDateTime lastUpdated, LocalDateTime postedAt, Severity severity, LocalDateTime lastAlertedAt) {
+    public IncidentEntity(Long id, String incidentKey, JiraStatus jiraStatus, String lastMsg, LocalDateTime lastUpdated, LocalDateTime postedAt, Severity severity, LocalDateTime lastAlertedAt, String assignedTo) {
         this.id = id;
         this.incidentKey = incidentKey;
         this.LastMsg = lastMsg;
@@ -106,6 +116,7 @@ public class IncidentEntity {
         this.severity = severity;
         this.jiraStatus = jiraStatus;
         this.lastAlertedAt = lastAlertedAt;
+        this.assignedTo = assignedTo;
     }
     public IncidentEntity(){
 
