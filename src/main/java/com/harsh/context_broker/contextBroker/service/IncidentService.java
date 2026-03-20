@@ -7,7 +7,11 @@ import com.harsh.context_broker.contextBroker.model.JiraStatus;
 import com.harsh.context_broker.contextBroker.model.Severity;
 import com.harsh.context_broker.contextBroker.repository.IncidentEventRepository;
 import com.harsh.context_broker.contextBroker.repository.IncidentRepository;
+import org.springframework.data.domain.Page;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -220,18 +224,26 @@ public class IncidentService {
         return evaluateSeverity(incident);
     }
 
-    public List<IncidentResponse> getAllIncidents() {
+    public Page<IncidentResponse> getAllIncidents(int page, int size, String sortBy, String direction) {
+        Sort sort = direction.equalsIgnoreCase("desc")
+                ? Sort.by(sortBy).descending()
+                : Sort.by(sortBy).ascending();
 
-        List<IncidentEntity> incidents = repository.findAll();
 
-        return incidents.stream().map(incident -> {
+        Pageable pageable = PageRequest.of(page, size, sort);
 
+        Page<IncidentEntity> incidentsPage = repository.findAll(pageable);
+
+        return incidentsPage.map(incident ->{
             IncidentResponse response = new IncidentResponse();
             response.setIncidentKey(incident.getIncidentKey());
             response.setLastMsg(incident.getLastMsg());
-            response.setJiraStatus(incident.getJiraStatus() != null
-                    ? incident.getJiraStatus().name()
-                    : null);
+
+            response.setJiraStatus(
+                    incident.getJiraStatus() != null
+                            ? incident.getJiraStatus().name()
+                            : null
+            );
 
             if (incident.getLastUpdated() != null) {
                 response.setLastUpdated(incident.getLastUpdated().toString());
@@ -244,8 +256,7 @@ public class IncidentService {
             }
 
             return response;
-
-        }).toList();
+        });
     }
 
     public List<TimelineEventResponse> getTimeLine(String incidentKey){
