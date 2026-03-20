@@ -4,6 +4,7 @@ import com.harsh.context_broker.contextBroker.dto.*;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
 import com.harsh.context_broker.contextBroker.service.IncidentService;
 import com.harsh.context_broker.contextBroker.service.TimelineService;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -55,8 +56,11 @@ public class IncidentController {
      }
 
     @GetMapping("/all")
-    public List<IncidentResponse> getAllIncidents() {
-        return incidentService.getAllIncidents();
+    public Page<IncidentResponse> getAllIncidents(@RequestParam(defaultValue = "0") int page,
+                                                  @RequestParam(defaultValue = "10") int size,
+                                                  @RequestParam(defaultValue = "lastUpdated") String sortBy,
+                                                  @RequestParam(defaultValue = "desc") String direction) {
+        return incidentService.getAllIncidents(page, size, sortBy, direction);
     }
 
     @GetMapping("/system-health")
