@@ -106,6 +106,20 @@ public class IncidentService {
 
     private AlertResponse evaluateSeverity(IncidentEntity incident) {
 
+        if(JiraStatus.RESOLVED.equals(incident.getJiraStatus())){
+            AlertResponse response = new AlertResponse();
+            response.setScore(0);
+            response.setReason("Incident resolved in Jira");
+            response.setSeverity(Severity.RESOLVED);
+
+            timelineService.logEvent(
+                    incident.getIncidentKey(),
+                    "RESOLVED",
+                    "Incident Resolved"
+            );
+            return response;
+        }
+
         Severity previousSeverity = incident.getSeverity();
 
         String message = incident.getLastMsg();
@@ -444,6 +458,10 @@ public class IncidentService {
     }
 
     private int calculateRiskScore(IncidentEntity incident) {
+
+        if (incident.getJiraStatus() == JiraStatus.RESOLVED){
+            return 0;
+        }
 
         if (incident == null) return 0;
 
