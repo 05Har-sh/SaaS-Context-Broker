@@ -2,6 +2,8 @@ package com.harsh.context_broker.contextBroker.controller;
 
 import com.harsh.context_broker.contextBroker.dto.*;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
+import com.harsh.context_broker.contextBroker.model.JiraStatus;
+import com.harsh.context_broker.contextBroker.model.Severity;
 import com.harsh.context_broker.contextBroker.service.IncidentService;
 import com.harsh.context_broker.contextBroker.service.TimelineService;
 import jakarta.validation.Valid;
@@ -60,9 +62,12 @@ public class IncidentController {
     public Page<IncidentResponse> getAllIncidents(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "lastUpdated") String sortBy,
-            @RequestParam(defaultValue = "desc") String direction) {
-        return incidentService.getAllIncidents(page, size, sortBy, direction);
+            @RequestParam(required = false) Severity severity,
+            @RequestParam(required = false) String assignedTo,
+            @RequestParam(required = false) Boolean stale,
+            @RequestParam(required = false) JiraStatus jiraStatus
+    ) {
+        return incidentService.getAllIncidents(page, size, severity, assignedTo, stale, jiraStatus);
     }
 
     @GetMapping("/system-health")

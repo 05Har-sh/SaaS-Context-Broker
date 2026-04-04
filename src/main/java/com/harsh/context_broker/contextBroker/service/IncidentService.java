@@ -8,11 +8,10 @@ import com.harsh.context_broker.contextBroker.model.JiraStatus;
 import com.harsh.context_broker.contextBroker.model.Severity;
 import com.harsh.context_broker.contextBroker.repository.IncidentEventRepository;
 import com.harsh.context_broker.contextBroker.repository.IncidentRepository;
-import org.springframework.data.domain.Page;
+import com.harsh.context_broker.contextBroker.specification.IncidentSpecification;
+import org.springframework.data.domain.*;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -239,47 +238,66 @@ public class IncidentService {
         return evaluateSeverity(incident);
     }
 
-    public Page<IncidentResponse> getAllIncidents(int page, int size, String sortBy, String direction) {
-        Sort sort = direction.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
-                : Sort.by(sortBy).ascending();
+    public Page<IncidentResponse> getAllIncidents(int page,
+                                                  int size,
+                                                  Severity severity,
+                                                  String assignedTo,
+                                                  Boolean stale,
+                                                  JiraStatus jiraStatus) {
 
+        Pageable pageable = PageRequest.of(page, size, Sort.by("lastUpdated").descending());
 
-        Pageable pageable = PageRequest.of(page, size, sort);
+        Specification<IncidentEntity> spec = Specification
+                .where(IncidentSpecification.hasSeverity(severity))
+                .and(IncidentSpecification.hasAssignedTo(assignedTo))
+                .and(IncidentSpecification.hasJiraStatus(jiraStatus));
+        Page<IncidentEntity> incidentsPage = repository.findAll(spec, pageable);
 
-        Page<IncidentEntity> incidentsPage = repository.findAll(pageable);
+        List<IncidentResponse> content = incidentsPage.getContent().stream()
+                .filter(i -> stale == null || isStale(i) == stale)
+                .map(this::mapToResponse)
+                .toList();
 
-        return incidentsPage.map(incident ->{
-            IncidentResponse response = new IncidentResponse();
-            response.setIncidentKey(incident.getIncidentKey());
-            response.setLastMsg(incident.getLastMsg());
+        return new PageImpl<>(
+                content,
+                pageable,
+                incidentsPage.getTotalElements()
+        );
+    }
 
-            response.setJiraStatus(
-                    incident.getJiraStatus() != null
-                            ? incident.getJiraStatus().name()
-                            : null
-            );
+    private IncidentResponse mapToResponse(IncidentEntity incident) {
 
-            if (incident.getLastUpdated() != null) {
-                response.setLastUpdated(incident.getLastUpdated().toString());
+        IncidentResponse response = new IncidentResponse();
 
-                boolean stale = Duration
-                        .between(incident.getLastUpdated(), LocalDateTime.now())
-                        .toMinutes() >= 1;
+        response.setIncidentKey(incident.getIncidentKey());
+        response.setLastMsg(incident.getLastMsg());
 
-                response.setStale(stale);
-            }
-            int riskScore = calculateRiskScore(incident);
-            response.setRiskScore(riskScore);
+        response.setJiraStatus(
+                incident.getJiraStatus() != null
+                        ? incident.getJiraStatus().name()
+                        : null
+        );
 
-            response.setSeverity(
-                    incident.getSeverity() != null
-                            ? incident.getSeverity()
-                            : Severity.LOW
-            );
+        if (incident.getLastUpdated() != null) {
+            response.setLastUpdated(incident.getLastUpdated().toString());
+            response.setStale(isStale(incident));
+        }
 
-            return response;
-        });
+        response.setSeverity(
+                incident.getSeverity() != null
+                        ? incident.getSeverity()
+                        : Severity.LOW
+        );
+
+        response.setRiskScore(calculateRiskScore(incident));
+
+        response.setAssignedTo(
+                incident.getAssignedTo() != null
+                        ? incident.getAssignedTo()
+                        : "UNASSIGNED"
+        );
+
+        return response;
     }
 
     public List<TimelineEventResponse> getTimeLine(String incidentKey){
