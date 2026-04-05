@@ -1,6 +1,5 @@
 package com.harsh.context_broker.contextBroker.dto;
 
-import java.time.LocalDateTime;
 
 public class TimelineEventResponse {
 
@@ -25,7 +24,7 @@ public class TimelineEventResponse {
         this.description = description;
     }
 
-    private LocalDateTime timeStamp;
+    private String timestamp;
 
     public String getSource() {
         return source;
@@ -43,18 +42,18 @@ public class TimelineEventResponse {
         this.content = content;
     }
 
-    public LocalDateTime getTimeStamp() {
-        return timeStamp;
+    public String getTimestamp() {
+        return timestamp;
     }
 
-    public void setTimeStamp(LocalDateTime timeStamp) {
-        this.timeStamp = timeStamp;
+    public void setTimestamp(String timestamp) {
+        this.timestamp = timestamp;
     }
 
-    public TimelineEventResponse(String source, String content,String eventType,String description, LocalDateTime timeStamp) {
+    public TimelineEventResponse(String source, String content,String eventType,String description, String timestamp) {
         this.source = source;
         this.content = content;
-        this.timeStamp = timeStamp;
+        this.timestamp = timestamp;
         this.eventType = eventType;
         this.description = description;
     }

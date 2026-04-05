@@ -1,7 +1,8 @@
 package com.harsh.context_broker.contextBroker.model;
 
-public enum JiraStatus {
-    OPEN,
+public enum IncidentStatus {
+    DETECTED,
+    CREATED,
     IN_PROGRESS,
     RESOLVED,
     CLOSED

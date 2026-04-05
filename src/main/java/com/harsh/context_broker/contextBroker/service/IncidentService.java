@@ -2,11 +2,10 @@ package com.harsh.context_broker.contextBroker.service;
 
 import com.harsh.context_broker.contextBroker.dto.*;
 import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
-import com.harsh.context_broker.contextBroker.entity.IncidentEventEntity;
 import com.harsh.context_broker.contextBroker.exception.ResourceNotFoundException;
+import com.harsh.context_broker.contextBroker.model.IncidentStatus;
 import com.harsh.context_broker.contextBroker.model.JiraStatus;
 import com.harsh.context_broker.contextBroker.model.Severity;
-import com.harsh.context_broker.contextBroker.repository.IncidentEventRepository;
 import com.harsh.context_broker.contextBroker.repository.IncidentRepository;
 import com.harsh.context_broker.contextBroker.specification.IncidentSpecification;
 import org.springframework.data.domain.*;
@@ -27,17 +26,16 @@ import java.util.stream.Collectors;
 @Service
 public class IncidentService {
     public final IncidentRepository repository;
-    private final IncidentEventRepository eventRepository;
     private final SlackNotifier slackNotifier;
     private final TimelineService timelineService;
     public static final long ALERT_COOLDOWN_MINUTES = 10;
 
-    public IncidentService(IncidentRepository repository,TimelineService timelineService, IncidentEventRepository eventRepository, SlackNotifier slackNotifier) {
+    public IncidentService(IncidentRepository repository, TimelineService timelineService, SlackNotifier slackNotifier) {
         this.repository = repository;
-        this.eventRepository = eventRepository;
         this.slackNotifier = slackNotifier;
         this.timelineService = timelineService;
     }
+
     @Value("${scoring.urgent}")
     private int urgentWeight;
 
@@ -50,6 +48,12 @@ public class IncidentService {
     @Value("${scoring.stale}")
     private int staleWeight;
 
+    @Value("${staleness.threshold.minutes}")
+    private long stalenessThresholdMinutes;
+
+    // ═══════════════════════════════════════════
+    //  INPUT HANDLERS
+    // ═══════════════════════════════════════════
 
     public AlertResponse handleUpdate(String incidentKey, String message) {
         AtomicBoolean isNew = new AtomicBoolean(false);
@@ -60,197 +64,196 @@ public class IncidentService {
                     i.setIncidentKey(incidentKey);
                     i.setPostedAt(LocalDateTime.now());
                     i.setLastUpdated(LocalDateTime.now());
+                    i.setIncidentStatus(IncidentStatus.CREATED);
                     return i;
                 });
-        if (isNew.get()) {
-            timelineService.logEvent(
-                    incidentKey,
-                    "CREATED",
-                    "Incident created via Slack update"
-            );
-        }
-        incident.setLastMsg(message);
-        timelineService.logEvent(
-                incidentKey,
-                "MESSAGE_RECEIVED",
-                "Slack message: " + message
-        );
-        incident.setLastUpdated(LocalDateTime.now());
-        AlertResponse alert = evaluateSeverity(incident);
-        if (alert != null) {
-            timelineService.logEvent(
-                    incidentKey,
-                    "SEVERITY_EVALUATED",
-                    "Score: " + alert.getScore()
-                            + ", Severity: "
-                            + alert.getSeverity()
-            );
-        }
-        
-        IncidentEventEntity event = new IncidentEventEntity();
-        event.setIncidentKey(incidentKey);
-        event.setSource("SLACK");
-        event.setContent(message);
-        event.setTimestamp(LocalDateTime.now());
-        eventRepository.save(event);
 
+        if (isNew.get()) {
+            timelineService.logEvent(incidentKey, "CREATED",
+                    "Incident created via Slack update", "SLACK", message);
+        }
+
+        incident.setLastMsg(message);
+        incident.setLastUpdated(LocalDateTime.now());
+
+        // Unified timeline — replaces old IncidentEventEntity
+        timelineService.logEvent(incidentKey, "MESSAGE_RECEIVED",
+                "Slack message: " + message, "SLACK", message);
+
+        AlertResponse alert = evaluateSeverity(incident);
         repository.save(incident);
         return alert;
     }
 
-    public IncidentEntity getIncidentByKey(String incidentKey) {
-        return repository.findByIncidentKey(incidentKey)
-                .orElseThrow(() -> new RuntimeException("Incident not found" + incidentKey));
+    public AlertResponse handleJiraUpdate(String incidentKey, JiraStatus status) {
+        IncidentEntity incident = repository.findByIncidentKey(incidentKey)
+                .orElseGet(() -> {
+                    IncidentEntity i = new IncidentEntity();
+                    i.setIncidentKey(incidentKey);
+                    i.setPostedAt(LocalDateTime.now());
+                    i.setLastUpdated(LocalDateTime.now());
+                    i.setIncidentStatus(IncidentStatus.CREATED);
+                    return i;
+                });
+
+        incident.setJiraStatus(status);
+        // Bug 5 fix: set lastUpdated BEFORE evaluating severity
+        incident.setLastUpdated(LocalDateTime.now());
+
+        // Map Jira status → incident lifecycle status
+        switch (status) {
+            case OPEN -> incident.setIncidentStatus(IncidentStatus.CREATED);
+            case IN_PROGRESS -> incident.setIncidentStatus(IncidentStatus.IN_PROGRESS);
+            case RESOLVED -> {
+                incident.setIncidentStatus(IncidentStatus.RESOLVED);
+                if (incident.getResolvedAt() == null) {
+                    incident.setResolvedAt(LocalDateTime.now());
+                }
+            }
+            case CLOSED -> {
+                incident.setIncidentStatus(IncidentStatus.CLOSED);
+                if (incident.getResolvedAt() == null) {
+                    incident.setResolvedAt(LocalDateTime.now());
+                }
+            }
+        }
+
+        // Unified timeline — replaces old IncidentEventEntity
+        timelineService.logEvent(incidentKey, "JIRA_UPDATE",
+                "Jira status changed to " + status, "JIRA", "Status: " + status);
+
+        AlertResponse alert = evaluateSeverity(incident);
+        repository.save(incident);
+        return alert;
     }
+
+    // ═══════════════════════════════════════════
+    //  SEVERITY ENGINE (Core Intelligence)
+    // ═══════════════════════════════════════════
 
     private AlertResponse evaluateSeverity(IncidentEntity incident) {
 
-        if(JiraStatus.RESOLVED.equals(incident.getJiraStatus())){
+        // Resolved/Closed → score 0, keep existing severity (severity = impact, status = lifecycle)
+        if (incident.getIncidentStatus() == IncidentStatus.RESOLVED
+                || incident.getIncidentStatus() == IncidentStatus.CLOSED) {
             AlertResponse response = new AlertResponse();
             response.setScore(0);
-            response.setReason("Incident resolved in Jira");
-            response.setSeverity(Severity.RESOLVED);
+            response.setReason("Incident " + incident.getIncidentStatus().name().toLowerCase());
+            response.setSeverity(incident.getSeverity() != null ? incident.getSeverity() : Severity.LOW);
 
-            timelineService.logEvent(
-                    incident.getIncidentKey(),
-                    "RESOLVED",
-                    "Incident Resolved"
-            );
+            timelineService.logEvent(incident.getIncidentKey(),
+                    incident.getIncidentStatus().name(),
+                    "Incident " + incident.getIncidentStatus().name().toLowerCase() + ". Score reset to 0.");
             return response;
         }
 
         Severity previousSeverity = incident.getSeverity();
-
         String message = incident.getLastMsg();
-
         LocalDateTime lastUpdated = incident.getLastUpdated();
 
-        if(lastUpdated == null){
+        if (lastUpdated == null) {
             incident.setLastUpdated(LocalDateTime.now());
+            lastUpdated = incident.getLastUpdated();
         }
+
         boolean urgent = message != null && message.contains("URGENT");
+        long minutesSinceUpdate = Duration.between(lastUpdated, LocalDateTime.now()).toMinutes();
+        boolean stale = minutesSinceUpdate >= stalenessThresholdMinutes;
 
-        long minutesSinceUpdate = Duration
-                .between(lastUpdated, LocalDateTime.now())
-                .toMinutes();
-        boolean stale = minutesSinceUpdate >= 1; //keep 1 minute for testing
-
-        AlertResponse alertResponse = new AlertResponse();
         int score = 0;
         String reason = "";
 
-        if(urgent){
+        if (urgent) {
             score += urgentWeight;
             reason += "Slack marked URGENT. ";
         }
-        if(incident.getJiraStatus() == JiraStatus.OPEN){
+        if (incident.getJiraStatus() == JiraStatus.OPEN) {
             score += jiraOpenWeight;
             reason += "Jira still OPEN. ";
         }
-        if(incident.getJiraStatus() == JiraStatus.IN_PROGRESS){
+        if (incident.getJiraStatus() == JiraStatus.IN_PROGRESS) {
             score += jiraInProgressWeight;
             reason += "Jira IN_PROGRESS. ";
         }
-        if(stale){
+        if (stale) {
             score += staleWeight;
             reason += "Incident stale for " + minutesSinceUpdate + " mins. ";
         }
+
+        AlertResponse alertResponse = new AlertResponse();
         alertResponse.setScore(score);
         alertResponse.setReason(reason);
 
-        if(score >= 70){
+        // Severity thresholds with new MEDIUM level
+        if (score >= 70) {
             alertResponse.setSeverity(Severity.CRITICAL);
-        } else if (score >= 40) {
+        } else if (score >= 50) {
             alertResponse.setSeverity(Severity.HIGH);
-        } else{
+        } else if (score >= 30) {
+            alertResponse.setSeverity(Severity.MEDIUM);
+        } else {
             alertResponse.setSeverity(Severity.LOW);
         }
 
         Severity newSeverity = alertResponse.getSeverity();
         incident.setSeverity(newSeverity);
 
-        // ✅ Timeline → Severity evaluated
-        timelineService.logEvent(
-                incident.getIncidentKey(),
-                "SEVERITY_EVALUATED",
-                "Score: " + score + ", Severity: " + newSeverity
-        );
+        timelineService.logEvent(incident.getIncidentKey(),
+                "SEVERITY_EVALUATED", "Score: " + score + ", Severity: " + newSeverity);
 
-        // ✅ Timeline → Severity changed
         if (previousSeverity != newSeverity) {
-            timelineService.logEvent(
-                    incident.getIncidentKey(),
+            timelineService.logEvent(incident.getIncidentKey(),
                     "SEVERITY_CHANGED",
-                    "Severity changed from "
-                            + previousSeverity
-                            + " → "
-                            + newSeverity
-            );
+                    "Severity changed from " + previousSeverity + " → " + newSeverity);
         }
 
-        if((newSeverity == Severity.HIGH || newSeverity == Severity.CRITICAL)
-                && canSendAlert(incident)){
+        if ((newSeverity == Severity.HIGH || newSeverity == Severity.CRITICAL)
+                && canSendAlert(incident)) {
             slackNotifier.sendAlert(incident, alertResponse);
             incident.setLastAlertedAt(LocalDateTime.now());
-
-            timelineService.logEvent(
-                    incident.getIncidentKey(),
+            timelineService.logEvent(incident.getIncidentKey(),
                     "ALERT_SENT",
-                    "Slack alert triggered. Severity: "
-                            + newSeverity
-                            + ", Score: "
-                            + score
-            );
+                    "Slack alert triggered. Severity: " + newSeverity + ", Score: " + score);
         } else {
-            timelineService.logEvent(
-                    incident.getIncidentKey(),
+            timelineService.logEvent(incident.getIncidentKey(),
                     "ALERT_SKIPPED",
-                    "Cooldown active. Alert suppressed for severity " + newSeverity
-            );
+                    "Cooldown active. Alert suppressed for severity " + newSeverity);
         }
 
         return alertResponse;
     }
 
-    public AlertResponse handleJiraUpdate(String incidentKey, JiraStatus status){
-        IncidentEntity incident = repository.findByIncidentKey(incidentKey)
-                .orElseGet(()->{
-                    IncidentEntity i = new IncidentEntity();
-                    i.setIncidentKey(incidentKey);
-                    i.setPostedAt(LocalDateTime.now());
-                    return i;
-                });
-        incident.setJiraStatus(status);
-
-        IncidentEventEntity event = new IncidentEventEntity();
-        event.setIncidentKey(incidentKey);
-        event.setSource("JIRA");
-        event.setContent("Status changed to " + status);
-        event.setTimestamp(LocalDateTime.now());
-        eventRepository.save(event);
-
-        AlertResponse alert = evaluateSeverity(incident);
-        incident.setLastUpdated(LocalDateTime.now());
-        repository.save(incident);
-        return alert;
-    }
-    public AlertResponse evaluateSeverityPublic(IncidentEntity incident){
+    public AlertResponse evaluateSeverityPublic(IncidentEntity incident) {
         return evaluateSeverity(incident);
     }
 
-    public Page<IncidentResponse> getAllIncidents(int page,
-                                                  int size,
-                                                  Severity severity,
-                                                  String assignedTo,
-                                                  Boolean stale,
-                                                  JiraStatus jiraStatus) {
+    // ═══════════════════════════════════════════
+    //  READ OPERATIONS (no side effects)
+    // ═══════════════════════════════════════════
 
+    public IncidentEntity getIncidentByKey(String incidentKey) {
+        return repository.findByIncidentKey(incidentKey)
+                .orElseThrow(() -> new ResourceNotFoundException("Incident not found: " + incidentKey));
+    }
+
+    /**
+     * Returns a single incident as a response DTO (used by controller).
+     */
+    public IncidentResponse getIncidentResponse(String incidentKey) {
+        IncidentEntity incident = getIncidentByKey(incidentKey);
+        return mapToResponse(incident);
+    }
+
+    public Page<IncidentResponse> getAllIncidents(int page, int size,
+                                                  Severity severity, String assignedTo,
+                                                  Boolean stale, JiraStatus jiraStatus) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("lastUpdated").descending());
 
         Specification<IncidentEntity> spec = Specification
                 .where(IncidentSpecification.hasSeverity(severity))
                 .and(IncidentSpecification.hasAssignedTo(assignedTo))
                 .and(IncidentSpecification.hasJiraStatus(jiraStatus));
+
         Page<IncidentEntity> incidentsPage = repository.findAll(spec, pageable);
 
         List<IncidentResponse> content = incidentsPage.getContent().stream()
@@ -258,97 +261,82 @@ public class IncidentService {
                 .map(this::mapToResponse)
                 .toList();
 
-        return new PageImpl<>(
-                content,
-                pageable,
-                incidentsPage.getTotalElements()
-        );
+        return new PageImpl<>(content, pageable, incidentsPage.getTotalElements());
     }
 
     private IncidentResponse mapToResponse(IncidentEntity incident) {
-
         IncidentResponse response = new IncidentResponse();
-
         response.setIncidentKey(incident.getIncidentKey());
         response.setLastMsg(incident.getLastMsg());
-
-        response.setJiraStatus(
-                incident.getJiraStatus() != null
-                        ? incident.getJiraStatus().name()
-                        : null
-        );
+        response.setJiraStatus(incident.getJiraStatus() != null ? incident.getJiraStatus().name() : null);
+        response.setIncidentStatus(incident.getIncidentStatus() != null ? incident.getIncidentStatus().name() : null);
 
         if (incident.getLastUpdated() != null) {
             response.setLastUpdated(incident.getLastUpdated().toString());
             response.setStale(isStale(incident));
         }
 
-        response.setSeverity(
-                incident.getSeverity() != null
-                        ? incident.getSeverity()
-                        : Severity.LOW
-        );
+        boolean isTerminal = incident.getIncidentStatus() == IncidentStatus.RESOLVED
+                || incident.getIncidentStatus() == IncidentStatus.CLOSED;
 
-        response.setRiskScore(calculateRiskScore(incident));
-
-        response.setAssignedTo(
-                incident.getAssignedTo() != null
-                        ? incident.getAssignedTo()
-                        : "UNASSIGNED"
-        );
+        response.setSeverity(incident.getSeverity() != null ? incident.getSeverity() : Severity.LOW);
+        response.setRiskScore(isTerminal ? 0 : calculateRiskScore(incident));
+        response.setAssignedTo(incident.getAssignedTo() != null ? incident.getAssignedTo() : "UNASSIGNED");
 
         return response;
     }
 
-    public List<TimelineEventResponse> getTimeLine(String incidentKey){
-        List<IncidentEventEntity> events = eventRepository.findByIncidentKeyOrderByTimestampAsc(incidentKey);
-         return events.stream().map(event ->{
-             TimelineEventResponse dto = new TimelineEventResponse();
-             dto.setSource(event.getSource());
-             dto.setContent(event.getContent());
-             dto.setTimeStamp(event.getTimestamp());
-             return dto;
-         }).toList();
-    }
-
-    public IncidentDetailsResponse getIncidentDetails(String incidentKey){
+    /**
+     * Read-only — does NOT re-evaluate severity.
+     */
+    public IncidentDetailsResponse getIncidentDetails(String incidentKey) {
         IncidentEntity incident = repository.findByIncidentKey(incidentKey)
-                .orElseThrow(()->new RuntimeException("Incident not found"));
-        AlertResponse alert = evaluateSeverity(incident);
+                .orElseThrow(() -> new ResourceNotFoundException("Incident not found: " + incidentKey));
+
+        boolean isTerminal = incident.getIncidentStatus() == IncidentStatus.RESOLVED
+                || incident.getIncidentStatus() == IncidentStatus.CLOSED;
+
         IncidentDetailsResponse dto = new IncidentDetailsResponse();
         dto.setIncidentKey(incident.getIncidentKey());
         dto.setLastMsg(incident.getLastMsg());
-        dto.setJiraStatus(incident.getJiraStatus() != null
-                ? incident.getJiraStatus().name()
-                : null);
-        dto.setSeverity(alert.getSeverity().name());
-        dto.setLastUpdated(
-                incident.getLastUpdated() != null
-                ? incident.getLastUpdated().toString()
-                        : null
-        );
-        dto.setPostedAt(
-                incident.getPostedAt() != null
-                ? incident.getPostedAt().toString()
-                        : null
-        );
+        dto.setJiraStatus(incident.getJiraStatus() != null ? incident.getJiraStatus().name() : null);
+        dto.setIncidentStatus(incident.getIncidentStatus() != null ? incident.getIncidentStatus().name() : null);
+        dto.setSeverity(incident.getSeverity() != null ? incident.getSeverity().name() : Severity.LOW.name());
+        dto.setLastUpdated(incident.getLastUpdated() != null ? incident.getLastUpdated().toString() : null);
+        dto.setPostedAt(incident.getPostedAt() != null ? incident.getPostedAt().toString() : null);
+        dto.setRiskScore(isTerminal ? 0 : calculateRiskScore(incident));
+        dto.setAssignedTo(incident.getAssignedTo() != null ? incident.getAssignedTo() : "UNASSIGNED");
+
         return dto;
     }
 
-    public MetricsResponse getMetrics(){
+    // ═══════════════════════════════════════════
+    //  METRICS & ANALYTICS
+    // ═══════════════════════════════════════════
+
+    public MetricsResponse getMetrics() {
         List<IncidentEntity> incidents = repository.findAll();
 
         long total = incidents.size();
+
         long active = incidents.stream()
-                .filter(i -> i.getJiraStatus() != JiraStatus.RESOLVED)
+                .filter(i -> i.getIncidentStatus() != IncidentStatus.RESOLVED
+                        && i.getIncidentStatus() != IncidentStatus.CLOSED)
                 .count();
 
         long critical = incidents.stream()
-                .filter(i -> "CRITICAL".equals(i.getSeverity()))
+                .filter(i -> Severity.CRITICAL.equals(i.getSeverity()))
+                .filter(i -> i.getIncidentStatus() != IncidentStatus.RESOLVED
+                        && i.getIncidentStatus() != IncidentStatus.CLOSED)
                 .count();
 
         long stale = incidents.stream()
                 .filter(this::isStale)
+                .count();
+
+        long resolved = incidents.stream()
+                .filter(i -> i.getIncidentStatus() == IncidentStatus.RESOLVED
+                        || i.getIncidentStatus() == IncidentStatus.CLOSED)
                 .count();
 
         MetricsResponse response = new MetricsResponse();
@@ -356,38 +344,37 @@ public class IncidentService {
         response.setActive(active);
         response.setCritical(critical);
         response.setStale(stale);
-        response.setEscalationsToday(0); // later when alerts table exists
+        response.setResolved(resolved);
+        response.setEscalationsToday(0);
 
         return response;
     }
 
     private boolean isStale(IncidentEntity incident) {
+        // Resolved/closed incidents are never stale
+        if (incident.getIncidentStatus() == IncidentStatus.RESOLVED
+                || incident.getIncidentStatus() == IncidentStatus.CLOSED) {
+            return false;
+        }
         if (incident.getLastUpdated() == null) return false;
 
-        long minutes = Duration
-                .between(incident.getLastUpdated(), LocalDateTime.now())
-                .toMinutes();
-
-        return minutes >= 1; // adjust later
+        long minutes = Duration.between(incident.getLastUpdated(), LocalDateTime.now()).toMinutes();
+        return minutes >= stalenessThresholdMinutes;
     }
 
     public SystemHealthResponse getSystemHealth() {
-
         MetricsResponse metrics = getMetrics();
-
         SystemHealthResponse response = new SystemHealthResponse();
 
         if (metrics.getCritical() > 5) {
             response.setStatus("CRITICAL");
             response.setScore(40);
             response.setReasons(List.of("High number of critical incidents"));
-        }
-        else if (metrics.getStale() > 10) {
+        } else if (metrics.getStale() > 10) {
             response.setStatus("DEGRADED");
             response.setScore(70);
             response.setReasons(List.of("Many stale incidents"));
-        }
-        else {
+        } else {
             response.setStatus("HEALTHY");
             response.setScore(95);
             response.setReasons(List.of("System operating normally"));
@@ -396,9 +383,21 @@ public class IncidentService {
         return response;
     }
 
-    public RiskScoreResponse getRiskScore(String incidentKey) {
+    // ═══════════════════════════════════════════
+    //  RISK & PRIORITY
+    // ═══════════════════════════════════════════
 
+    public RiskScoreResponse getRiskScore(String incidentKey) {
         IncidentEntity incident = getIncidentByKey(incidentKey);
+
+        if (incident.getIncidentStatus() == IncidentStatus.RESOLVED
+                || incident.getIncidentStatus() == IncidentStatus.CLOSED) {
+            RiskScoreResponse response = new RiskScoreResponse();
+            response.setIncidentKey(incidentKey);
+            response.setRiskScore(0);
+            response.setReason("Incident " + incident.getIncidentStatus().name().toLowerCase() + ".");
+            return response;
+        }
 
         int score = 0;
         String reason = "";
@@ -407,17 +406,14 @@ public class IncidentService {
             score += 40;
             reason += "URGENT detected. ";
         }
-
         if (incident.getJiraStatus() == JiraStatus.OPEN) {
             score += 30;
             reason += "Jira OPEN. ";
         }
-
         if (isStale(incident)) {
             score += 20;
             reason += "Incident stale. ";
         }
-
         if (Severity.CRITICAL.equals(incident.getSeverity())) {
             score += 50;
             reason += "Severity CRITICAL. ";
@@ -427,17 +423,17 @@ public class IncidentService {
         response.setIncidentKey(incidentKey);
         response.setRiskScore(score);
         response.setReason(reason);
-
         return response;
     }
 
     public PriorityResponse getPriority(String incidentKey) {
-
         IncidentEntity incident = getIncidentByKey(incidentKey);
-
         String priority = "LOW";
 
-        if (Severity.CRITICAL.equals(incident.getSeverity())) {
+        if (incident.getIncidentStatus() == IncidentStatus.RESOLVED
+                || incident.getIncidentStatus() == IncidentStatus.CLOSED) {
+            priority = "RESOLVED";
+        } else if (Severity.CRITICAL.equals(incident.getSeverity())) {
             priority = "P1";
         } else if (Severity.HIGH.equals(incident.getSeverity())) {
             priority = "HIGH";
@@ -448,21 +444,21 @@ public class IncidentService {
         PriorityResponse response = new PriorityResponse();
         response.setIncidentKey(incidentKey);
         response.setPriority(priority);
-
         return response;
     }
 
-    public boolean canSendAlert(IncidentEntity incident){
-        if(incident.getLastAlertedAt() == null) return true;
+    public boolean canSendAlert(IncidentEntity incident) {
+        if (incident.getLastAlertedAt() == null) return true;
         LocalDateTime nextAllowed = incident.getLastAlertedAt().plusMinutes(ALERT_COOLDOWN_MINUTES);
         return LocalDateTime.now().isAfter(nextAllowed);
     }
 
     public HighestRiskResponse getHighestRisk() {
-
         List<IncidentEntity> incidents = repository.findAll();
 
         IncidentEntity highest = incidents.stream()
+                .filter(i -> i.getIncidentStatus() != IncidentStatus.RESOLVED
+                        && i.getIncidentStatus() != IncidentStatus.CLOSED)
                 .max(Comparator.comparingInt(this::calculateRiskScore))
                 .orElse(null);
 
@@ -471,75 +467,58 @@ public class IncidentService {
         HighestRiskResponse response = new HighestRiskResponse();
         response.setIncidentKey(highest.getIncidentKey());
         response.setRiskScore(calculateRiskScore(highest));
-
         return response;
     }
 
+    // Bug 4 fix: null check BEFORE dereferencing
     private int calculateRiskScore(IncidentEntity incident) {
+        if (incident == null) return 0;
 
-        if (incident.getJiraStatus() == JiraStatus.RESOLVED){
+        if (incident.getIncidentStatus() == IncidentStatus.RESOLVED
+                || incident.getIncidentStatus() == IncidentStatus.CLOSED) {
             return 0;
         }
 
-        if (incident == null) return 0;
-
         int score = 0;
-
         String message = incident.getLastMsg();
         LocalDateTime lastUpdated = incident.getLastUpdated();
 
-        // 🔴 Slack urgency
         if (message != null && message.contains("URGENT")) {
-            score += urgentWeight; // e.g. 50
+            score += urgentWeight;
         }
 
-        // 🟡 Jira status weighting
         if (incident.getJiraStatus() == JiraStatus.OPEN) {
-            score += jiraOpenWeight; // e.g. 30
-        }
-        else if (incident.getJiraStatus() == JiraStatus.IN_PROGRESS) {
-            score += jiraInProgressWeight; // e.g. 10
+            score += jiraOpenWeight;
+        } else if (incident.getJiraStatus() == JiraStatus.IN_PROGRESS) {
+            score += jiraInProgressWeight;
         }
 
-        // ⏱ Staleness factor
         if (lastUpdated != null) {
-
-            long minutes = Duration
-                    .between(lastUpdated, LocalDateTime.now())
-                    .toMinutes();
-
-            if (minutes >= 60) {          // 1 hour stale
-                score += staleWeight;     // e.g. 20
-            }
-
-            // 🔥 Progressive escalation (optional realism)
-            if (minutes >= 180) {         // 3 hours
-                score += 10;
-            }
-
-            if (minutes >= 360) {         // 6 hours
-                score += 20;
-            }
+            long minutes = Duration.between(lastUpdated, LocalDateTime.now()).toMinutes();
+            if (minutes >= 60) score += staleWeight;
+            if (minutes >= 180) score += 10;
+            if (minutes >= 360) score += 20;
         }
 
-        // 🔥 Severity reinforcement (if already computed)
         if (incident.getSeverity() == Severity.CRITICAL) {
             score += 20;
-        }
-        else if (incident.getSeverity() == Severity.HIGH) {
+        } else if (incident.getSeverity() == Severity.HIGH) {
             score += 10;
         }
 
-        return Math.min(score, 100); // cap at 100
+        return Math.min(score, 100);
     }
 
-    public List<SeverityDistributionResponse> getSeverityDistribution() {
+    // ═══════════════════════════════════════════
+    //  DISTRIBUTION & TREND
+    // ═══════════════════════════════════════════
 
+    public List<SeverityDistributionResponse> getSeverityDistribution() {
         return repository.findAll().stream()
-                .collect(Collectors.groupingBy(
-                        IncidentEntity::getSeverity,
-                        Collectors.counting()
-                ))
+                .filter(i -> i.getSeverity() != null)
+                .filter(i -> i.getIncidentStatus() != IncidentStatus.RESOLVED
+                        && i.getIncidentStatus() != IncidentStatus.CLOSED)
+                .collect(Collectors.groupingBy(IncidentEntity::getSeverity, Collectors.counting()))
                 .entrySet().stream()
                 .map(entry -> {
                     SeverityDistributionResponse r = new SeverityDistributionResponse();
@@ -551,63 +530,48 @@ public class IncidentService {
     }
 
     public List<TrendResponse> getTrend() {
-
         LocalDate today = LocalDate.now();
         LocalDate sevenDaysAgo = today.minusDays(6);
 
-        // Group incidents by date
         Map<LocalDate, Long> grouped = repository.findAll().stream()
                 .filter(i -> i.getPostedAt() != null)
                 .map(i -> i.getPostedAt().toLocalDate())
                 .filter(date -> !date.isBefore(sevenDaysAgo))
-                .collect(Collectors.groupingBy(
-                        date -> date,
-                        Collectors.counting()
-                ));
+                .collect(Collectors.groupingBy(date -> date, Collectors.counting()));
 
         List<TrendResponse> result = new ArrayList<>();
-
-        // Ensure all 7 days are present
         for (int i = 0; i < 7; i++) {
             LocalDate date = sevenDaysAgo.plusDays(i);
-
             TrendResponse response = new TrendResponse();
             response.setDate(date.toString());
             response.setCount(grouped.getOrDefault(date, 0L).intValue());
-
             result.add(response);
         }
-
         return result;
     }
 
+    // ═══════════════════════════════════════════
+    //  ASSIGNMENT
+    // ═══════════════════════════════════════════
 
     public void assignIncident(String incidentKey, String assignedTo) {
         IncidentEntity incident = repository.findByIncidentKey(incidentKey)
-                .orElseThrow(() ->new ResourceNotFoundException("Incident not found: " + incidentKey));
+                .orElseThrow(() -> new ResourceNotFoundException("Incident not found: " + incidentKey));
         String previousAssignee = incident.getAssignedTo();
 
-        if(assignedTo.equalsIgnoreCase(previousAssignee)){
-            return;//no change
+        if (assignedTo.equalsIgnoreCase(previousAssignee)) {
+            return;
         }
 
         incident.setAssignedTo(assignedTo);
         incident.setLastUpdated(LocalDateTime.now());
         repository.save(incident);
 
-        if(previousAssignee == null){
-            timelineService.logEvent(
-                    incidentKey,
-                    "ASSIGNED",
-                    "Assigned to " + assignedTo
-            );
-        }else {
-            timelineService.logEvent(
-                    incidentKey,
-                    "REASSIGNED",
-                    "Reassigned from " + previousAssignee + " to " + assignedTo
-            );
+        if (previousAssignee == null) {
+            timelineService.logEvent(incidentKey, "ASSIGNED", "Assigned to " + assignedTo);
+        } else {
+            timelineService.logEvent(incidentKey, "REASSIGNED",
+                    "Reassigned from " + previousAssignee + " to " + assignedTo);
         }
     }
 }
-

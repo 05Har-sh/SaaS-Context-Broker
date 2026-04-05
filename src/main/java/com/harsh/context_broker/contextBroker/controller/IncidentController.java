@@ -1,7 +1,6 @@
 package com.harsh.context_broker.contextBroker.controller;
 
 import com.harsh.context_broker.contextBroker.dto.*;
-import com.harsh.context_broker.contextBroker.entity.IncidentEntity;
 import com.harsh.context_broker.contextBroker.model.JiraStatus;
 import com.harsh.context_broker.contextBroker.model.Severity;
 import com.harsh.context_broker.contextBroker.service.IncidentService;
@@ -10,8 +9,6 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -21,42 +18,33 @@ public class IncidentController {
     private final IncidentService incidentService;
     private final TimelineService timelineService;
 
-     public IncidentController(IncidentService incidentService, TimelineService timelineService){
-         this.incidentService = incidentService;
-         this.timelineService = timelineService;
-     }
+    public IncidentController(IncidentService incidentService, TimelineService timelineService) {
+        this.incidentService = incidentService;
+        this.timelineService = timelineService;
+    }
+
+    /**
+     * returns complete IncidentResponse including severity, riskScore, status.
+     */
     @GetMapping("/{incidentKey}")
-     public IncidentResponse getIncidentDetails(@PathVariable String incidentKey){
-         IncidentEntity incident = incidentService.getIncidentByKey(incidentKey);
+    public IncidentResponse getIncident(@PathVariable String incidentKey) {
+        return incidentService.getIncidentResponse(incidentKey);
+    }
 
-         IncidentResponse response = new IncidentResponse();
-         response.setIncidentKey(incident.getIncidentKey());
-         response.setLastMsg(incident.getLastMsg());
-        if (incident.getLastUpdated() != null) {
-            response.setLastUpdated(incident.getLastUpdated().toString());
-        }
-         boolean isStale = Duration
-                 .between(incident.getLastUpdated(), LocalDateTime.now())
-                 .toMinutes() > 1;
-         response.setStale(isStale);
+    @GetMapping("/{incidentKey}/timeline")
+    public List<TimelineEventResponse> getTimeLine(@PathVariable String incidentKey) {
+        return timelineService.getTimelineForIncident(incidentKey);
+    }
 
-         return response ;
-     }
+    @GetMapping("/incident-details/{incidentKey}")
+    public IncidentDetailsResponse getIncidentDetails(@PathVariable String incidentKey) {
+        return incidentService.getIncidentDetails(incidentKey);
+    }
 
-     @GetMapping("/{incidentKey}/timeline")
-     public List<TimelineEventResponse> getTimeLine(@PathVariable String incidentKey){
-         return timelineService.getTimelineForIncident(incidentKey);
-     }
-
-         @GetMapping("/incident-details/{incidentKey}")
-     public IncidentDetailsResponse getIncidentDetailsDetails(@PathVariable String incidentKey){
-         return incidentService.getIncidentDetails(incidentKey);
-     }
-
-     @GetMapping("/metrics")
-     public MetricsResponse getMetrics() {
-         return incidentService.getMetrics();
-     }
+    @GetMapping("/metrics")
+    public MetricsResponse getMetrics() {
+        return incidentService.getMetrics();
+    }
 
     @GetMapping("/all")
     public Page<IncidentResponse> getAllIncidents(
@@ -103,13 +91,8 @@ public class IncidentController {
     @PostMapping("/{incidentKey}/assign")
     public ApiSuccessResponse assignIncident(
             @PathVariable String incidentKey,
-            @Valid @RequestBody AssignRequest request){
-         incidentService.assignIncident(incidentKey, request.getAssignedTo());
-         return new ApiSuccessResponse("Incident assigned successfully");
+            @Valid @RequestBody AssignRequest request) {
+        incidentService.assignIncident(incidentKey, request.getAssignedTo());
+        return new ApiSuccessResponse("Incident assigned successfully");
     }
-
-//    @GetMapping("/search")
-//    public List<IncidentResponse> search(@RequestParam String q) {
-//        return incidentService.searchIncidents(q);
-//    }
 }
