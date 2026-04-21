@@ -6,6 +6,8 @@ import com.harsh.context_broker.contextBroker.model.JiraStatus;
 import com.harsh.context_broker.contextBroker.model.Severity;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDateTime;
+
 public class IncidentSpecification {
     public static Specification<IncidentEntity> hasSeverity(Severity severity) {
         return (root, query, cb) ->
@@ -28,5 +30,35 @@ public class IncidentSpecification {
         return (root, query, cb) ->
                 status == null ? null :
                         cb.equal(root.get("incidentStatus"), status);
+    }
+
+    public static Specification<IncidentEntity> hasStale(Boolean stale, LocalDateTime cutoff) {
+        return (root, query, cb) -> {
+            if (stale == null) return null;
+
+            var status = root.<IncidentStatus>get("incidentStatus");
+            var lastUpdated = root.<LocalDateTime>get("lastUpdated");
+
+            var terminal = cb.or(
+                    cb.equal(status, IncidentStatus.RESOLVED),
+                    cb.equal(status, IncidentStatus.CLOSED)
+            );
+
+            // isStale == true  => non-terminal AND lastUpdated != null AND lastUpdated <= cutoff
+            if (Boolean.TRUE.equals(stale)) {
+                return cb.and(
+                        cb.not(terminal),
+                        cb.isNotNull(lastUpdated),
+                        cb.lessThanOrEqualTo(lastUpdated, cutoff)
+                );
+            }
+
+            // isStale == false => terminal OR lastUpdated == null OR lastUpdated > cutoff
+            return cb.or(
+                    terminal,
+                    cb.isNull(lastUpdated),
+                    cb.greaterThan(lastUpdated, cutoff)
+            );
+        };
     }
 }

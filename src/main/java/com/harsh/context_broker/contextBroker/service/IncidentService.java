@@ -207,17 +207,22 @@ public class IncidentService {
                     "Severity changed from " + previousSeverity + " → " + newSeverity);
         }
 
-        if ((newSeverity == Severity.HIGH || newSeverity == Severity.CRITICAL)
-                && canSendAlert(incident)) {
-            slackNotifier.sendAlert(incident, alertResponse);
-            incident.setLastAlertedAt(LocalDateTime.now());
-            timelineService.logEvent(incident.getIncidentKey(),
-                    "ALERT_SENT",
-                    "Slack alert triggered. Severity: " + newSeverity + ", Score: " + score);
+        if (newSeverity == Severity.HIGH || newSeverity == Severity.CRITICAL) {
+            if (canSendAlert(incident)) {
+                slackNotifier.sendAlert(incident, alertResponse);
+                incident.setLastAlertedAt(LocalDateTime.now());
+                timelineService.logEvent(incident.getIncidentKey(),
+                        "ALERT_SENT",
+                        "Slack alert triggered. Severity: " + newSeverity + ", Score: " + score);
+            } else {
+                timelineService.logEvent(incident.getIncidentKey(),
+                        "ALERT_SKIPPED",
+                        "Cooldown active. Alert suppressed for severity " + newSeverity);
+            }
         } else {
             timelineService.logEvent(incident.getIncidentKey(),
                     "ALERT_SKIPPED",
-                    "Cooldown active. Alert suppressed for severity " + newSeverity);
+                    "Alert threshold not met for severity " + newSeverity);
         }
 
         return alertResponse;
@@ -247,21 +252,17 @@ public class IncidentService {
     public Page<IncidentResponse> getAllIncidents(int page, int size,
                                                   Severity severity, String assignedTo,
                                                   Boolean stale, JiraStatus jiraStatus) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("lastUpdated").descending());
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(stalenessThresholdMinutes);
 
         Specification<IncidentEntity> spec = Specification
                 .where(IncidentSpecification.hasSeverity(severity))
                 .and(IncidentSpecification.hasAssignedTo(assignedTo))
-                .and(IncidentSpecification.hasJiraStatus(jiraStatus));
+                .and(IncidentSpecification.hasJiraStatus(jiraStatus))
+                .and(IncidentSpecification.hasStale(stale, cutoff));
 
+        Pageable pageable = PageRequest.of(page, size, Sort.by("lastUpdated").descending());
         Page<IncidentEntity> incidentsPage = repository.findAll(spec, pageable);
-
-        List<IncidentResponse> content = incidentsPage.getContent().stream()
-                .filter(i -> stale == null || isStale(i) == stale)
-                .map(this::mapToResponse)
-                .toList();
-
-        return new PageImpl<>(content, pageable, incidentsPage.getTotalElements());
+        return incidentsPage.map(this::mapToResponse);
     }
 
     private IncidentResponse mapToResponse(IncidentEntity incident) {
@@ -470,7 +471,6 @@ public class IncidentService {
         return response;
     }
 
-    // Bug 4 fix: null check BEFORE dereferencing
     private int calculateRiskScore(IncidentEntity incident) {
         if (incident == null) return 0;
 
