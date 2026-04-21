@@ -32,4 +32,4 @@ build/
 ### VS Code ###
 .vscode/
 
-codebase_audit context broker
+src/main/resources/application.properties
