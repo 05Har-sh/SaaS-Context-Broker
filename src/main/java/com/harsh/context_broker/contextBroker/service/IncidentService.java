@@ -97,7 +97,7 @@ public class IncidentService {
                 });
 
         incident.setJiraStatus(status);
-        // Bug 5 fix: set lastUpdated BEFORE evaluating severity
+
         incident.setLastUpdated(LocalDateTime.now());
 
         // Map Jira status → incident lifecycle status

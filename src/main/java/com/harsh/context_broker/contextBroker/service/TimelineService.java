@@ -64,8 +64,7 @@ public class TimelineService {
         allEvents.addAll(legacyEvents);
 
         // Sort descending by looking at the raw string timestamp or we can sort by comparing string directly.
-        // But since it's ISO string, reverse string comparison is fine. 
-        // More robust: sort them in the stream before mapping, or just string compare.
+        // But since it's ISO string, reverse string comparison is fine.
         allEvents.sort((a, b) -> {
             if (a.getTimestamp() == null) return 1;
             if (b.getTimestamp() == null) return -1;
