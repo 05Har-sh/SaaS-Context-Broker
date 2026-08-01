@@ -14,7 +14,7 @@ public class WebhookConfigService {
         this.repository = repository;
     }
 
-    public void saveWebhook(String url){
+    public void saveWebhook(String url){  // save Slack webhookUrl
         WebhookConfig config = repository.findAll()
                 .stream()
                 .findFirst()
@@ -23,11 +23,29 @@ public class WebhookConfigService {
         config.setWebhookUrl(url);
         repository.save(config);
     }
+
+    public void saveJiraWebhookUrl(String url){
+        WebhookConfig config = repository.findAll()
+                .stream()
+                .findFirst()
+                .orElse(new WebhookConfig());
+        config.setJiraWebhookUrl(url);
+        repository.save(config);
+    }
+
     public String getWebhook(){
         return repository.findAll()
                 .stream()
                 .findFirst()
                 .map(WebhookConfig::getWebhookUrl)
+                .orElse(null);
+    }
+
+    public String getJiraWebhook(){
+        return repository.findAll()
+                .stream()
+                .findFirst()
+                .map(WebhookConfig::getJiraWebhookUrl)
                 .orElse(null);
     }
 }
