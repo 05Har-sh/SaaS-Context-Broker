@@ -1,6 +1,7 @@
 package com.harsh.context_broker.contextBroker.controller;
 
 import com.harsh.context_broker.contextBroker.dto.ApiSuccessResponse;
+import com.harsh.context_broker.contextBroker.dto.JiraWebhookConfigRequest;
 import com.harsh.context_broker.contextBroker.dto.WebhookConfigRequest;
 import com.harsh.context_broker.contextBroker.service.WebhookConfigService;
 import jakarta.validation.Valid;
@@ -24,5 +25,11 @@ public class WebhookConfigController {
 
         service.saveWebhook(request.getWebhookUrl());
         return new ApiSuccessResponse("Slack Webhook saved succesfully");
+    }
+
+    @PostMapping("/jira")
+    public ApiSuccessResponse saveJiraWebhook(@Valid @RequestBody JiraWebhookConfigRequest request){
+        service.saveJiraWebhookUrl(request.getWebhookUrl());
+        return new ApiSuccessResponse("Jira webhook saved successfully");
     }
 }

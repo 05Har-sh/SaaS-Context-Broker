@@ -9,7 +9,8 @@ public class WebhookConfig {
     @Id
     @GeneratedValue
     private Long id;
-    private String webhookUrl;
+    private String webhookUrl; // slack webhookUrl
+    private String jiraWebhookUrl; // jira webhookUrl
 
     public Long getId() {
         return id;
@@ -25,5 +26,13 @@ public class WebhookConfig {
 
     public void setWebhookUrl(String webhookUrl) {
         this.webhookUrl = webhookUrl;
+    }
+
+    public String getJiraWebhookUrl() {
+        return jiraWebhookUrl;
+    }
+
+    public void setJiraWebhookUrl(String jiraWebhookUrl) {
+        this.jiraWebhookUrl = jiraWebhookUrl;
     }
 }
