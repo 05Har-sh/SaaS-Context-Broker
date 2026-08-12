@@ -233,7 +233,7 @@ public class IncidentService {
     }
 
     // ═══════════════════════════════════════════
-    //  READ OPERATIONS (no side effects)
+    //  READ OPERATIONS
     // ═══════════════════════════════════════════
 
     public IncidentEntity getIncidentByKey(String incidentKey) {
