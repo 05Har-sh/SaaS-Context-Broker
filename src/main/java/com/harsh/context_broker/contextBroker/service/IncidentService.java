@@ -16,10 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -156,7 +153,7 @@ public class IncidentService {
             lastUpdated = incident.getLastUpdated();
         }
 
-        boolean urgent = message != null && message.contains("URGENT");
+        boolean urgent = message != null && message.toUpperCase(Locale.ROOT).contains("URGENT");
         long minutesSinceUpdate = Duration.between(lastUpdated, LocalDateTime.now()).toMinutes();
         boolean stale = minutesSinceUpdate >= stalenessThresholdMinutes;
 
@@ -483,7 +480,7 @@ public class IncidentService {
         String message = incident.getLastMsg();
         LocalDateTime lastUpdated = incident.getLastUpdated();
 
-        if (message != null && message.contains("URGENT")) {
+        if (message != null && message.toUpperCase(Locale.ROOT).contains("URGENT")) {
             score += urgentWeight;
         }
 
