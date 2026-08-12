@@ -8,6 +8,7 @@ import com.harsh.context_broker.contextBroker.model.JiraStatus;
 import com.harsh.context_broker.contextBroker.model.Severity;
 import com.harsh.context_broker.contextBroker.repository.IncidentRepository;
 import com.harsh.context_broker.contextBroker.specification.IncidentSpecification;
+import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.jpa.domain.Specification;
@@ -16,10 +17,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -63,7 +61,7 @@ public class IncidentService {
                     IncidentEntity i = new IncidentEntity();
                     i.setIncidentKey(incidentKey);
                     i.setPostedAt(LocalDateTime.now());
-                    i.setLastUpdated(LocalDateTime.now());
+                    i.setLastActivityAt(LocalDateTime.now());
                     i.setIncidentStatus(IncidentStatus.CREATED);
                     return i;
                 });
@@ -74,7 +72,7 @@ public class IncidentService {
         }
 
         incident.setLastMsg(message);
-        incident.setLastUpdated(LocalDateTime.now());
+        incident.setLastActivityAt(LocalDateTime.now());
 
         // Unified timeline — replaces old IncidentEventEntity
         timelineService.logEvent(incidentKey, "MESSAGE_RECEIVED",
@@ -91,14 +89,14 @@ public class IncidentService {
                     IncidentEntity i = new IncidentEntity();
                     i.setIncidentKey(incidentKey);
                     i.setPostedAt(LocalDateTime.now());
-                    i.setLastUpdated(LocalDateTime.now());
+                    i.setLastActivityAt(LocalDateTime.now());
                     i.setIncidentStatus(IncidentStatus.CREATED);
                     return i;
                 });
 
         incident.setJiraStatus(status);
 
-        incident.setLastUpdated(LocalDateTime.now());
+        incident.setLastActivityAt(LocalDateTime.now());
 
         // Map Jira status → incident lifecycle status
         switch (status) {
@@ -149,15 +147,14 @@ public class IncidentService {
 
         Severity previousSeverity = incident.getSeverity();
         String message = incident.getLastMsg();
-        LocalDateTime lastUpdated = incident.getLastUpdated();
+        LocalDateTime activityTime = incident.getLastActivityAt();
 
-        if (lastUpdated == null) {
-            incident.setLastUpdated(LocalDateTime.now());
-            lastUpdated = incident.getLastUpdated();
+        if (activityTime == null) {
+            activityTime = LocalDateTime.now();
         }
 
-        boolean urgent = message != null && message.contains("URGENT");
-        long minutesSinceUpdate = Duration.between(lastUpdated, LocalDateTime.now()).toMinutes();
+        boolean urgent = message != null && message.toUpperCase(Locale.ROOT).contains("URGENT");
+        long minutesSinceUpdate = Duration.between(activityTime, LocalDateTime.now()).toMinutes();
         boolean stale = minutesSinceUpdate >= stalenessThresholdMinutes;
 
         int score = 0;
@@ -357,9 +354,9 @@ public class IncidentService {
                 || incident.getIncidentStatus() == IncidentStatus.CLOSED) {
             return false;
         }
-        if (incident.getLastUpdated() == null) return false;
+        if (incident.getLastActivityAt() == null) return false;
 
-        long minutes = Duration.between(incident.getLastUpdated(), LocalDateTime.now()).toMinutes();
+        long minutes = Duration.between(incident.getLastActivityAt(), LocalDateTime.now()).toMinutes();
         return minutes >= stalenessThresholdMinutes;
     }
 
@@ -481,9 +478,9 @@ public class IncidentService {
 
         int score = 0;
         String message = incident.getLastMsg();
-        LocalDateTime lastUpdated = incident.getLastUpdated();
+        LocalDateTime lastActivity = incident.getLastActivityAt();
 
-        if (message != null && message.contains("URGENT")) {
+        if (message != null && message.toUpperCase(Locale.ROOT).contains("URGENT")) {
             score += urgentWeight;
         }
 
@@ -493,8 +490,8 @@ public class IncidentService {
             score += jiraInProgressWeight;
         }
 
-        if (lastUpdated != null) {
-            long minutes = Duration.between(lastUpdated, LocalDateTime.now()).toMinutes();
+        if (lastActivity != null) {
+            long minutes = Duration.between(lastActivity, LocalDateTime.now()).toMinutes();
             if (minutes >= 60) score += staleWeight;
             if (minutes >= 180) score += 10;
             if (minutes >= 360) score += 20;

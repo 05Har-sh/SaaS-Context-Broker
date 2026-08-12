@@ -37,6 +37,7 @@ public class IncidentSpecification {
             if (stale == null) return null;
 
             var status = root.<IncidentStatus>get("incidentStatus");
+            var activityTime = root.<LocalDateTime>get("lastActivityAt");
             var lastUpdated = root.<LocalDateTime>get("lastUpdated");
 
             var terminal = cb.or(
@@ -44,20 +45,28 @@ public class IncidentSpecification {
                     cb.equal(status, IncidentStatus.CLOSED)
             );
 
-            // isStale == true  => non-terminal AND lastUpdated != null AND lastUpdated <= cutoff
+            /**
+            * isStale == true => non-terminal AND effective activity time != null
+            * AND effective activity time <= cutoff
+            *
+            * effective activity time = lastActivityAt if available, otherwise lastUpdated.
+            */
             if (Boolean.TRUE.equals(stale)) {
                 return cb.and(
+                        //only active incidents can be stale
                         cb.not(terminal),
-                        cb.isNotNull(lastUpdated),
-                        cb.lessThanOrEqualTo(lastUpdated, cutoff)
+                        cb.isNotNull(cb.coalesce(activityTime, lastUpdated)),
+                        cb.lessThanOrEqualTo(cb.coalesce(activityTime, lastUpdated), cutoff)
                 );
             }
 
-            // isStale == false => terminal OR lastUpdated == null OR lastUpdated > cutoff
+            /**
+            * isStale == false => terminal OR effective activity time == null OR effective activity time > cutoff
+            */
             return cb.or(
                     terminal,
-                    cb.isNull(lastUpdated),
-                    cb.greaterThan(lastUpdated, cutoff)
+                    cb.isNull(cb.coalesce(activityTime, lastUpdated)),
+                    cb.greaterThan(cb.coalesce(activityTime, lastUpdated), cutoff)
             );
         };
     }
