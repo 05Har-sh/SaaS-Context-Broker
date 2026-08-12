@@ -16,6 +16,7 @@ public class IncidentEntity {
     private String incidentKey;
     private String lastMsg;
     private LocalDateTime lastUpdated;
+    private LocalDateTime lastActivityAt;
     private LocalDateTime postedAt;
 
     @Enumerated(EnumType.STRING)
@@ -35,7 +36,13 @@ public class IncidentEntity {
 
     private String assignedTo;
 
-    // ── Getters & Setters ──
+    public LocalDateTime getLastActivityAt() {
+        return lastActivityAt;
+    }
+
+    public void setLastActivityAt(LocalDateTime lastActivityAt) {
+        this.lastActivityAt = lastActivityAt;
+    }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -73,11 +80,11 @@ public class IncidentEntity {
     public String getAssignedTo() { return assignedTo; }
     public void setAssignedTo(String assignedTo) { this.assignedTo = assignedTo; }
 
-    // ── Constructors ──
+
 
     public IncidentEntity(Long id, String incidentKey, JiraStatus jiraStatus, IncidentStatus incidentStatus,
                           String lastMsg, LocalDateTime lastUpdated, LocalDateTime postedAt,
-                          Severity severity, LocalDateTime lastAlertedAt, LocalDateTime resolvedAt, String assignedTo) {
+                          Severity severity, LocalDateTime lastAlertedAt, LocalDateTime resolvedAt, String assignedTo, LocalDateTime lastActivityAt) {
         this.id = id;
         this.incidentKey = incidentKey;
         this.lastMsg = lastMsg;
@@ -89,6 +96,7 @@ public class IncidentEntity {
         this.lastAlertedAt = lastAlertedAt;
         this.resolvedAt = resolvedAt;
         this.assignedTo = assignedTo;
+        this.lastActivityAt = lastActivityAt;
     }
 
     public IncidentEntity() {}
