@@ -1,5 +1,7 @@
 # SaaS Context Broker
 
+UML diagram : https://drive.google.com/file/d/1Sm1MkWL6G0ztmEeC3wRWd_k0ADsMc3gV/view?usp=sharing
+
 A Spring Boot service that brokers incident context between Slack and Jira, evaluates incident severity, tracks timeline events, and exposes incident analytics APIs for dashboards and operations workflows.
 
 ## What it does
