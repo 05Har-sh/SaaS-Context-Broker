@@ -5,6 +5,7 @@ import com.harsh.context_broker.contextBroker.dto.JiraWebhookConfigRequest;
 import com.harsh.context_broker.contextBroker.dto.WebhookConfigRequest;
 import com.harsh.context_broker.contextBroker.service.WebhookConfigService;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,6 +22,7 @@ public class WebhookConfigController {
         this.service = service;
     }
     @PostMapping("/slack")
+    @PreAuthorize("hasRole('ADMIN') ")
     public ApiSuccessResponse saveWebhook(@Valid @RequestBody WebhookConfigRequest request){
 
         service.saveWebhook(request.getWebhookUrl());
@@ -28,6 +30,7 @@ public class WebhookConfigController {
     }
 
     @PostMapping("/jira")
+    @PreAuthorize("hasRole('ADMIN') ")
     public ApiSuccessResponse saveJiraWebhook(@Valid @RequestBody JiraWebhookConfigRequest request){
         service.saveJiraWebhookUrl(request.getWebhookUrl());
         return new ApiSuccessResponse("Jira webhook saved successfully");
