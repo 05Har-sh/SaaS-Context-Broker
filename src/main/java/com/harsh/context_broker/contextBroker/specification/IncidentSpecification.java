@@ -9,6 +9,12 @@ import org.springframework.data.jpa.domain.Specification;
 import java.time.LocalDateTime;
 
 public class IncidentSpecification {
+
+    public static Specification<IncidentEntity> hasTenantId(String tenantId) {
+        return (root, query, cb) ->
+                cb.equal(root.get("tenantId"), tenantId);
+    }
+
     public static Specification<IncidentEntity> hasSeverity(Severity severity) {
         return (root, query, cb) ->
                 severity == null ? null : cb.equal(root.get("severity"), severity);

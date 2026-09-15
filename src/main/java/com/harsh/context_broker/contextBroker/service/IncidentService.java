@@ -56,10 +56,12 @@ public class IncidentService {
 
     public AlertResponse handleUpdate(String incidentKey, String message) {
         AtomicBoolean isNew = new AtomicBoolean(false);
-        IncidentEntity incident = repository.findByIncidentKey(incidentKey)
+        String tenantId = TenantContext.requireTenantId();
+        IncidentEntity incident = repository.findByTenantIdAndIncidentKey(tenantId, incidentKey)
                 .orElseGet(() -> {
                     isNew.set(true);
                     IncidentEntity i = new IncidentEntity();
+                    i.setTenantId(tenantId);
                     i.setIncidentKey(incidentKey);
                     i.setPostedAt(LocalDateTime.now());
                     i.setLastActivityAt(LocalDateTime.now());
@@ -85,9 +87,11 @@ public class IncidentService {
     }
 
     public AlertResponse handleJiraUpdate(String incidentKey, JiraStatus status) {
-        IncidentEntity incident = repository.findByIncidentKey(incidentKey)
+        String tenantId = TenantContext.requireTenantId();
+        IncidentEntity incident = repository.findByTenantIdAndIncidentKey(tenantId, incidentKey)
                 .orElseGet(() -> {
                     IncidentEntity i = new IncidentEntity();
+                    i.setTenantId(tenantId);
                     i.setIncidentKey(incidentKey);
                     i.setPostedAt(LocalDateTime.now());
                     i.setLastActivityAt(LocalDateTime.now());
@@ -235,7 +239,8 @@ public class IncidentService {
     // ═══════════════════════════════════════════
 
     public IncidentEntity getIncidentByKey(String incidentKey) {
-        return repository.findByIncidentKey(incidentKey)
+        String tenantId = TenantContext.requireTenantId();
+        return repository.findByTenantIdAndIncidentKey(tenantId, incidentKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Incident not found: " + incidentKey));
     }
 
@@ -252,8 +257,11 @@ public class IncidentService {
                                                   Boolean stale, JiraStatus jiraStatus) {
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(stalenessThresholdMinutes);
 
+        String tenantId = TenantContext.requireTenantId();
+
         Specification<IncidentEntity> spec = Specification
-                .where(IncidentSpecification.hasSeverity(severity))
+                .where(IncidentSpecification.hasTenantId(tenantId))
+                .and(IncidentSpecification.hasSeverity(severity))
                 .and(IncidentSpecification.hasAssignedTo(assignedTo))
                 .and(IncidentSpecification.hasJiraStatus(jiraStatus))
                 .and(IncidentSpecification.hasStale(stale, cutoff));
@@ -289,7 +297,8 @@ public class IncidentService {
      * Read-only — does NOT re-evaluate severity.
      */
     public IncidentDetailsResponse getIncidentDetails(String incidentKey) {
-        IncidentEntity incident = repository.findByIncidentKey(incidentKey)
+        String tenantId = TenantContext.requireTenantId();
+        IncidentEntity incident = repository.findByTenantIdAndIncidentKey(tenantId, incidentKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Incident not found: " + incidentKey));
 
         boolean isTerminal = incident.getIncidentStatus() == IncidentStatus.RESOLVED
@@ -314,8 +323,9 @@ public class IncidentService {
     // ═══════════════════════════════════════════
 
     public MetricsResponse getMetrics() {
-        List<IncidentEntity> incidents = repository.findAll();
+        String tenantId = TenantContext.requireTenantId();
 
+        List<IncidentEntity> incidents = repository.findAllByTenantId(tenantId);
         long total = incidents.size();
 
         long active = incidents.stream()
@@ -453,7 +463,8 @@ public class IncidentService {
     }
 
     public HighestRiskResponse getHighestRisk() {
-        List<IncidentEntity> incidents = repository.findAll();
+        String tenantId = TenantContext.requireTenantId();
+        List<IncidentEntity> incidents = repository.findAllByTenantId(tenantId);
 
         IncidentEntity highest = incidents.stream()
                 .filter(i -> i.getIncidentStatus() != IncidentStatus.RESOLVED
@@ -512,7 +523,8 @@ public class IncidentService {
     // ═══════════════════════════════════════════
 
     public List<SeverityDistributionResponse> getSeverityDistribution() {
-        return repository.findAll().stream()
+        String tenantId = TenantContext.requireTenantId();
+        return repository.findAllByTenantId(tenantId).stream()
                 .filter(i -> i.getSeverity() != null)
                 .filter(i -> i.getIncidentStatus() != IncidentStatus.RESOLVED
                         && i.getIncidentStatus() != IncidentStatus.CLOSED)
@@ -528,10 +540,11 @@ public class IncidentService {
     }
 
     public List<TrendResponse> getTrend() {
+        String tenantId = TenantContext.requireTenantId();
         LocalDate today = LocalDate.now();
         LocalDate sevenDaysAgo = today.minusDays(6);
 
-        Map<LocalDate, Long> grouped = repository.findAll().stream()
+        Map<LocalDate, Long> grouped = repository.findAllByTenantId(tenantId).stream()
                 .filter(i -> i.getPostedAt() != null)
                 .map(i -> i.getPostedAt().toLocalDate())
                 .filter(date -> !date.isBefore(sevenDaysAgo))
@@ -553,7 +566,8 @@ public class IncidentService {
     // ═══════════════════════════════════════════
 
     public void assignIncident(String incidentKey, String assignedTo) {
-        IncidentEntity incident = repository.findByIncidentKey(incidentKey)
+        String tenantId = TenantContext.requireTenantId();
+        IncidentEntity incident = repository.findByTenantIdAndIncidentKey(tenantId, incidentKey)
                 .orElseThrow(() -> new ResourceNotFoundException("Incident not found: " + incidentKey));
         String previousAssignee = incident.getAssignedTo();
 

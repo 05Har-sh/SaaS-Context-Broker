@@ -5,6 +5,7 @@ import com.harsh.context_broker.contextBroker.entity.IncidentEventEntity;
 import com.harsh.context_broker.contextBroker.entity.TimelineEventEntity;
 import com.harsh.context_broker.contextBroker.repository.IncidentEventRepository;
 import com.harsh.context_broker.contextBroker.repository.TimelineEventRepository;
+import com.harsh.context_broker.contextBroker.tenant.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +38,11 @@ public class TimelineService {
      * Log an event with explicit source and content (for Slack/Jira events).
      */
     public void logEvent(String incidentKey, String type, String description, String source, String content) {
+
+        String tenantId = TenantContext.requireTenantId();
+
         TimelineEventEntity event = new TimelineEventEntity();
+        event.setTenantId(tenantId);
         event.setIncidentKey(incidentKey);
         event.setEventType(type);
         event.setDescription(description);
@@ -49,12 +54,13 @@ public class TimelineService {
     }
 
     public List<TimelineEventResponse> getTimelineForIncident(String incidentKey) {
-        List<TimelineEventResponse> newEvents = repository.findByIncidentKeyOrderByTimestampDesc(incidentKey)
+        String tenantId = TenantContext.requireTenantId();
+        List<TimelineEventResponse> newEvents = repository.findByTenantIdAndIncidentKeyOrderByTimestampDesc(tenantId, incidentKey)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
 
-        List<TimelineEventResponse> legacyEvents = legacyRepository.findByIncidentKeyOrderByTimestampAsc(incidentKey)
+        List<TimelineEventResponse> legacyEvents = legacyRepository.findByTenantIdAndIncidentKeyOrderByTimestampAsc(tenantId, incidentKey)
                 .stream()
                 .map(this::mapLegacyToResponse)
                 .collect(Collectors.toList());

@@ -1,8 +1,6 @@
 package com.harsh.context_broker.contextBroker.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 
 @Entity
 public class WebhookConfig {
@@ -11,6 +9,9 @@ public class WebhookConfig {
     private Long id;
     private String webhookUrl; // slack webhookUrl
     private String jiraWebhookUrl; // jira webhookUrl
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     public Long getId() {
         return id;
@@ -35,4 +36,13 @@ public class WebhookConfig {
     public void setJiraWebhookUrl(String jiraWebhookUrl) {
         this.jiraWebhookUrl = jiraWebhookUrl;
     }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
+    }
+
 }
