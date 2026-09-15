@@ -13,6 +13,9 @@ public class IncidentEntity {
     @GeneratedValue
     private Long id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     private String incidentKey;
     private String lastMsg;
     private LocalDateTime lastUpdated;
@@ -46,6 +49,14 @@ public class IncidentEntity {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
+    }
 
     public String getIncidentKey() { return incidentKey; }
     public void setIncidentKey(String incidentKey) { this.incidentKey = incidentKey; }

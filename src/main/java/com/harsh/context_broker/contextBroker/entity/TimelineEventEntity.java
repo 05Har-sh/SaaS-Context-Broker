@@ -1,9 +1,6 @@
 package com.harsh.context_broker.contextBroker.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
+import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
@@ -13,6 +10,9 @@ public class TimelineEventEntity {
     @GeneratedValue
     private Long id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     private String incidentKey;
     private String eventType;       // CREATED / SEVERITY_EVALUATED / ALERT_SENT / JIRA_UPDATE etc.
     private String source;          // SLACK / JIRA / SYSTEM
@@ -21,10 +21,17 @@ public class TimelineEventEntity {
     private String content;         // Raw event content (nullable)
     private LocalDateTime timestamp;
 
-    // ── Getters & Setters ──
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
+    }
 
     public String getIncidentKey() { return incidentKey; }
     public void setIncidentKey(String incidentKey) { this.incidentKey = incidentKey; }
@@ -43,8 +50,7 @@ public class TimelineEventEntity {
 
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
-
-    // ── Constructors ──
+    
 
     public TimelineEventEntity(Long id, String incidentKey, String eventType, String source,
                                String description, String content, LocalDateTime timestamp) {

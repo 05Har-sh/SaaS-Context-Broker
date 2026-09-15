@@ -1,8 +1,7 @@
 package com.harsh.context_broker.contextBroker.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
+import jakarta.persistence.Column;
+import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
@@ -11,6 +10,10 @@ public class IncidentEventEntity {
     @Id
     @GeneratedValue
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     private String incidentKey;
     private String source;
     private String content;
@@ -18,6 +21,14 @@ public class IncidentEventEntity {
 
     public Long getId() {
         return id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public void setId(Long id) {
