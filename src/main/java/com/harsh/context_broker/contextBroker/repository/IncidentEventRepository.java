@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface IncidentEventRepository extends JpaRepository<IncidentEventEntity, Long> {
-    List<IncidentEventEntity> findByIncidentKeyOrderByTimestampAsc(String incidentKey);
+    List<IncidentEventEntity> findByTenantIdAndIncidentKeyOrderByTimestampAsc(String tenantId, String incidentKey);
 }
