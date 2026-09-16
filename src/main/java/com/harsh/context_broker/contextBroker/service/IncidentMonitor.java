@@ -32,58 +32,59 @@ public class IncidentMonitor {
     @Scheduled(fixedRate = 60000)
     public void monitorIncidents() {
 
-        List<IncidentEntity> incidents = incidentRepository.findAll();
-        for (IncidentEntity incident : incidents) {
+        List<String> tenantIds = incidentRepository.findDistinctTenantIds();
+        for (String tenantId : tenantIds) {
+            TenantContext.setTenantId(tenantId);
+            try {
+                List<IncidentEntity> incidents = incidentRepository.findAllByTenantId(tenantId);
+                for (IncidentEntity incident : incidents) {
 
-            TenantContext.setTenantId(incident.getTenantId());
+                    // Skip resolved/closed incidents — they should not be re-evaluated
+                    if (incident.getIncidentStatus() == IncidentStatus.RESOLVED
+                            || incident.getIncidentStatus() == IncidentStatus.CLOSED) {
+                        continue;
+                    }
+                    LocalDateTime activityTime = incident.getLastActivityAt() != null
+                            ? incident.getLastActivityAt()
+                            : incident.getLastUpdated();
 
-            try{
+                    if (activityTime == null) {
+                        continue;
+                    }
 
-                // Skip resolved/closed incidents — they should not be re-evaluated
-                if (incident.getIncidentStatus() == IncidentStatus.RESOLVED
-                        || incident.getIncidentStatus() == IncidentStatus.CLOSED) {
-                    continue;
+                    Long minutesSinceActivity = Duration
+                            .between(activityTime, LocalDateTime.now())
+                            .toMinutes();
+                    if (minutesSinceActivity < stalenessThresholdMinutes) {
+                        continue;
+                    }
+
+                    AlertResponse alert = incidentService.evaluateSeverityPublic(incident);
+                    if (alert == null || alert.getSeverity() != Severity.CRITICAL) {
+                        continue;
+                    }
+
+                    LocalDateTime lastEscalated = incident.getLastEscalatedAt();
+
+                    boolean cooldownActive = lastEscalated != null && Duration
+                            .between(lastEscalated, LocalDateTime.now())
+                            .toMinutes() < 5;
+
+                    if (cooldownActive) {
+                        continue;
+                    }
+
+                    String slackMessage = "🚨 CRITICAL INCIDENT: "
+                            + incident.getIncidentKey()
+                            + "\nScore: " + alert.getScore()
+                            + "\nReason: " + alert.getReason();
+
+                    slackNotifier.sendAlert(slackMessage);
+                    incident.setLastEscalatedAt(LocalDateTime.now());
+                    incidentRepository.save(incident);
+
                 }
-                LocalDateTime activityTime = incident.getLastActivityAt() != null
-                        ?incident.getLastActivityAt()
-                        :incident.getLastUpdated();
-
-                if (activityTime == null) {
-                    continue;
-                }
-
-                Long minutesSinceActivity = Duration
-                        .between(activityTime, LocalDateTime.now())
-                        .toMinutes();
-                if (minutesSinceActivity < stalenessThresholdMinutes) {
-                    continue;
-                }
-
-                AlertResponse alert = incidentService.evaluateSeverityPublic(incident);
-                if (alert == null || alert.getSeverity() != Severity.CRITICAL) {
-                    continue;
-                }
-
-                LocalDateTime lastEscalated = incident.getLastEscalatedAt();
-
-                boolean cooldownActive = lastEscalated != null && Duration
-                        .between(lastEscalated, LocalDateTime.now())
-                        .toMinutes() < 5;
-
-                if (cooldownActive) {
-                    continue;
-                }
-
-                String slackMessage = "🚨 CRITICAL INCIDENT: "
-                        + incident.getIncidentKey()
-                        + "\nScore: " + alert.getScore()
-                        + "\nReason: " + alert.getReason();
-
-                slackNotifier.sendAlert(slackMessage);
-                incident.setLastEscalatedAt(LocalDateTime.now());
-                incidentRepository.save(incident);
-
-            }finally {
+            } finally {
                 TenantContext.clear();
             }
         }
