@@ -13,6 +13,9 @@ public class SlackIncomingRequest {
         return incidentKey;
     }
 
+    @NotBlank(message = "Team ID must not be blank")
+    private String teamId;
+
     public void setIncidentKey(@NotBlank(message = "Incident key must not be blank") String incidentKey) {
         this.incidentKey = incidentKey;
     }
@@ -25,11 +28,24 @@ public class SlackIncomingRequest {
         this.message = message;
     }
 
-    public SlackIncomingRequest(String incidentKey, String message) {
+    public SlackIncomingRequest(
+            String teamId,
+            String incidentKey,
+            String message) {
+
+        this.teamId = teamId;
         this.incidentKey = incidentKey;
         this.message = message;
     }
 
     public SlackIncomingRequest() {
+    }
+
+    public String getTeamId() {
+        return teamId;
+    }
+
+    public void setTeamId(String teamId) {
+        this.teamId = teamId;
     }
 }

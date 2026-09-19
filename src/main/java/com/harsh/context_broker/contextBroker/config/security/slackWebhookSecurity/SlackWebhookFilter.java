@@ -1,0 +1,69 @@
+package com.harsh.context_broker.contextBroker.config.security.slackWebhookSecurity;
+
+import com.harsh.context_broker.contextBroker.dto.SlackIncomingRequest;
+import com.harsh.context_broker.contextBroker.entity.SlackIntegration;
+import com.harsh.context_broker.contextBroker.service.SlackIntegrationService;
+import com.harsh.context_broker.contextBroker.tenant.TenantContext;
+import jakarta.servlet.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+@Component
+public class SlackWebhookFilter implements Filter {
+    private final SlackSignatureVerifier signatureVerifier;
+    private final SlackIntegrationService integrationService;
+    private final ObjectMapper objectMapper;
+
+    public SlackWebhookFilter(SlackSignatureVerifier signatureVerifier, SlackIntegrationService integrationService, ObjectMapper objectMapper) {
+        this.signatureVerifier = signatureVerifier;
+        this.integrationService = integrationService;
+        this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
+        HttpServletResponse httpResponse = (HttpServletResponse) response;
+        if (!httpRequest.getRequestURI().equals("/incoming/slack")) {
+            chain.doFilter(request, response);
+            return;
+        }
+        CachedBodyHttpServletRequest cachedRequest = new CachedBodyHttpServletRequest(httpRequest);
+
+        String rawBody = new String(cachedRequest.getCachedBody(), StandardCharsets.UTF_8);
+
+        String timeStamp = cachedRequest.getHeader( "X-Slack-Request-Timestamp");
+
+        String signature = cachedRequest.getHeader("X-Slack-Signature");
+
+        SlackIncomingRequest slackRequest = objectMapper.readValue(rawBody, SlackIncomingRequest.class);
+
+        String teamId = slackRequest.getTeamId();
+
+        SlackIntegration integration = integrationService.getByTeamId(teamId);
+
+        boolean valid = signatureVerifier.isValid(
+                timeStamp,
+                signature,
+                rawBody,
+                integration.getSigningSecret()
+        );
+        if (!valid) {
+            httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
+        String tenantId = integration.getTenantId();
+        TenantContext.setTenantId(tenantId);
+
+        try {
+            chain.doFilter(cachedRequest, response);
+        } finally {
+            TenantContext.clear();
+        }
+    }
+}
