@@ -1,4 +1,4 @@
-package com.harsh.context_broker.contextBroker.config;
+package com.harsh.context_broker.contextBroker.security;
 
 import java.util.List;
 import java.util.Map;

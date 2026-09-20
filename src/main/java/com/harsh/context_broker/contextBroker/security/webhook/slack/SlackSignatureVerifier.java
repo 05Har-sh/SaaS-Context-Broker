@@ -1,4 +1,4 @@
-package com.harsh.context_broker.contextBroker.config.security.slackWebhookSecurity;
+package com.harsh.context_broker.contextBroker.security.webhook.slack;
 
 import org.springframework.stereotype.Component;
 
@@ -50,10 +50,6 @@ public class SlackSignatureVerifier {
         }
         long currentTimestamp = System.currentTimeMillis() / 1000;
 
-        System.out.println(
-                "Difference: " +
-                        Math.abs(currentTimestamp - requestTimestamp)
-        );
 
         if (Math.abs(currentTimestamp - requestTimestamp) > MAX_TIMESTAMP_AGE_SECONDS) {
             return false;

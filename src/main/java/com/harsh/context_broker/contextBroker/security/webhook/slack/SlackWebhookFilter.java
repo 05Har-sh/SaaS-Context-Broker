@@ -1,5 +1,6 @@
-package com.harsh.context_broker.contextBroker.config.security.slackWebhookSecurity;
+package com.harsh.context_broker.contextBroker.security.webhook.slack;
 
+import com.harsh.context_broker.contextBroker.security.webhook.common.CachedBodyHttpServletRequest;
 import com.harsh.context_broker.contextBroker.dto.SlackIncomingRequest;
 import com.harsh.context_broker.contextBroker.entity.SlackIntegration;
 import com.harsh.context_broker.contextBroker.service.SlackIntegrationService;

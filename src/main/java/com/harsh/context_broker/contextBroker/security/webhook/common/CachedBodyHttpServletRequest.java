@@ -1,4 +1,4 @@
-package com.harsh.context_broker.contextBroker.config.security.slackWebhookSecurity;
+package com.harsh.context_broker.contextBroker.security.webhook.common;
 
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
