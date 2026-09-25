@@ -36,8 +36,9 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/info", "/error").permitAll()
                         .requestMatchers("/incoming/**").permitAll() // webhook callbacks from Slack/Jira
+                        .requestMatchers("/test-rate-limit").permitAll()
                         .anyRequest().authenticated()
                 )
 
