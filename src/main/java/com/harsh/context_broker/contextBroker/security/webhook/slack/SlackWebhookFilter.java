@@ -1,5 +1,6 @@
 package com.harsh.context_broker.contextBroker.security.webhook.slack;
 
+import com.harsh.context_broker.contextBroker.security.credential.CredentialEncryptionService;
 import com.harsh.context_broker.contextBroker.security.rateLimit.RedisRateLimiter;
 import com.harsh.context_broker.contextBroker.security.webhook.common.CachedBodyHttpServletRequest;
 import com.harsh.context_broker.contextBroker.dto.SlackIncomingRequest;
@@ -22,12 +23,14 @@ public class SlackWebhookFilter implements Filter {
     private final SlackIntegrationService integrationService;
     private final ObjectMapper objectMapper;
     private final RedisRateLimiter rateLimiter;
+    private final CredentialEncryptionService credentialEncryptionService;
 
-    public SlackWebhookFilter(SlackSignatureVerifier signatureVerifier, SlackIntegrationService integrationService, ObjectMapper objectMapper, RedisRateLimiter rateLimiter) {
+    public SlackWebhookFilter(SlackSignatureVerifier signatureVerifier, SlackIntegrationService integrationService, ObjectMapper objectMapper, RedisRateLimiter rateLimiter, CredentialEncryptionService credentialEncryptionService) {
         this.signatureVerifier = signatureVerifier;
         this.integrationService = integrationService;
         this.objectMapper = objectMapper;
         this.rateLimiter = rateLimiter;
+        this.credentialEncryptionService = credentialEncryptionService;
     }
 
     @Override
@@ -61,11 +64,12 @@ public class SlackWebhookFilter implements Filter {
             return;
         }
 
+        String signingSecret = credentialEncryptionService.decrypt(integration.getSigningSecret());
         boolean valid = signatureVerifier.isValid(
                 timeStamp,
                 signature,
                 rawBody,
-                integration.getSigningSecret()
+                signingSecret
         );
         if (!valid) {
             httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
