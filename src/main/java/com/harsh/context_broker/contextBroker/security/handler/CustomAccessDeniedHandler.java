@@ -1,4 +1,4 @@
-package com.harsh.context_broker.contextBroker.config.security;
+package com.harsh.context_broker.contextBroker.security.handler;
 
 
 import com.harsh.context_broker.contextBroker.dto.ApiErrorResponse;

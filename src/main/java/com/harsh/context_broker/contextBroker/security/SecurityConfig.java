@@ -1,4 +1,4 @@
-package com.harsh.context_broker.contextBroker.config;
+package com.harsh.context_broker.contextBroker.security;
 
 import java.util.List;
 import java.util.Map;
@@ -36,8 +36,9 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/info", "/error").permitAll()
                         .requestMatchers("/incoming/**").permitAll() // webhook callbacks from Slack/Jira
+                        .requestMatchers("/test-rate-limit").permitAll()
                         .anyRequest().authenticated()
                 )
 

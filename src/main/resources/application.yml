@@ -15,11 +15,11 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:}
+#  security:
+#    oauth2:
+#      resourceserver:
+#        jwt:
+#          issuer-uri: ${KEYCLOAK_ISSUER_URI:}
   flyway:
     enabled: true
 
