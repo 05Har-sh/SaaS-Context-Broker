@@ -28,7 +28,7 @@ spring:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/context-broker-dev}
 security:
   credential-encryption:
-    key: ${CREDENTIAL_ENCRYPTION_KEY}
+    key: ${CREDENTIAL_ENCRYPTION_KEY:my-local-dev-default-key}
 
 logging:
   level:

@@ -2,6 +2,7 @@ package com.harsh.context_broker.contextBroker.security.webhook.jira;
 
 import com.harsh.context_broker.contextBroker.entity.JiraIntegration;
 import com.harsh.context_broker.contextBroker.repository.JiraIntegrationRepository;
+import com.harsh.context_broker.contextBroker.security.credential.CredentialEncryptionService;
 import com.harsh.context_broker.contextBroker.security.rateLimit.RedisRateLimiter;
 import com.harsh.context_broker.contextBroker.security.webhook.common.CachedBodyHttpServletRequest;
 import com.harsh.context_broker.contextBroker.service.JiraWebhookEventService;
@@ -29,13 +30,15 @@ public class jiraWebhookFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper;
     private final JiraWebhookEventService webhookEventService;
     private final RedisRateLimiter rateLimiter;
+    private final CredentialEncryptionService encryptionService;
 
-    public jiraWebhookFilter(JiraSignatureVerifier signatureVerifier, JiraIntegrationRepository integrationRepository, ObjectMapper objectMapper, JiraWebhookEventService webhookEventService, RedisRateLimiter rateLimiter) {
+    public jiraWebhookFilter(JiraSignatureVerifier signatureVerifier, JiraIntegrationRepository integrationRepository, ObjectMapper objectMapper, JiraWebhookEventService webhookEventService, RedisRateLimiter rateLimiter, CredentialEncryptionService encryptionService) {
         this.signatureVerifier = signatureVerifier;
         this.integrationRepository = integrationRepository;
         this.objectMapper = objectMapper;
         this.webhookEventService = webhookEventService;
         this.rateLimiter = rateLimiter;
+        this.encryptionService = encryptionService;
     }
 
     @Override
@@ -79,8 +82,8 @@ public class jiraWebhookFilter extends OncePerRequestFilter {
                 StandardCharsets.UTF_8
         );
 
-
-        boolean valid = signatureVerifier.verify(rawBody, integration.getWebhookSecret(), signature);
+        String webhookSecret = encryptionService.decrypt(integration.getWebhookSecret());
+        boolean valid = signatureVerifier.verify(rawBody, webhookSecret, signature);
         if (!valid) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid Jira webhook signature");
             return;
