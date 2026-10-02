@@ -39,6 +39,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/info", "/error").permitAll()
                         .requestMatchers("/incoming/**").permitAll() // webhook callbacks from Slack/Jira
                         .requestMatchers("/test-rate-limit").permitAll()
+                        .requestMatchers("/integrations/slack/oauth/callback").permitAll()
+                        .requestMatchers("/integrations/jira/oauth/callback").permitAll()
                         .anyRequest().authenticated()
                 )
 

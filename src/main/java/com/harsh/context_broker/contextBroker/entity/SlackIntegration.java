@@ -15,8 +15,17 @@ public class SlackIntegration {
     @Column(name = "team_id", nullable = false, unique = true)
     private String teamId;
 
+    @Column(name = "team_name")
+    private String teamName;
+
+    @Column(name = "bot_user_id")
+    private String botUserId;
+
     @Column(name = "signing_secret", nullable = false)
     private String signingSecret;
+
+    @Column(name = "access_token_encrypted")
+    private String accessTokenEncrypted;
 
     public Long getId() {
         return id;
@@ -44,5 +53,33 @@ public class SlackIntegration {
 
     public void setSigningSecret(String signingSecret) {
         this.signingSecret = signingSecret;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getTeamName() {
+        return teamName;
+    }
+
+    public void setTeamName(String teamName) {
+        this.teamName = teamName;
+    }
+
+    public String getBotUserId() {
+        return botUserId;
+    }
+
+    public void setBotUserId(String botUserId) {
+        this.botUserId = botUserId;
+    }
+
+    public String getAccessTokenEncrypted() {
+        return accessTokenEncrypted;
+    }
+
+    public void setAccessTokenEncrypted(String accessTokenEncrypted) {
+        this.accessTokenEncrypted = accessTokenEncrypted;
     }
 }
