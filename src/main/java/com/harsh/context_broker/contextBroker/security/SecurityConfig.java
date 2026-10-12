@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/test-rate-limit").permitAll()
                         .requestMatchers("/integrations/slack/oauth/callback").permitAll()
                         .requestMatchers("/integrations/jira/oauth/callback").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                         .anyRequest().authenticated()
                 )
 

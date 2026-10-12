@@ -3,6 +3,12 @@ rate-limit:
     capacity: 5
     refill-rate: 1
     ttl-seconds: 300
+keycloak:
+  admin:
+    server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8080}
+    realm: ${KEYCLOAK_REALM:context-broker-dev}
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:context-broker-admin}
+    client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
 spring:
   data:
     redis:

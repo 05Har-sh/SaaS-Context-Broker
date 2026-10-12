@@ -25,7 +25,7 @@ public class SlackOAuthClient {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("client_id", properties.getClientId());
         form.add("client_secret", properties.getClientSecret());
-        form.add(code, "code");
+        form.add("code", code);
         form.add("redirect_uri", properties.getRedirectUri());
 
         SlackOAuthAccessResponse response = restClient.post()
