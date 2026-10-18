@@ -9,6 +9,7 @@ public class JiraOAuthProperties {
     private String redirectUri;
     private String scopes;
     private String webhookUrl;
+    private String webhookJql;
 
     public String getWebhookUrl() {
         return webhookUrl;
@@ -16,6 +17,14 @@ public class JiraOAuthProperties {
 
     public void setWebhookUrl(String webhookUrl) {
         this.webhookUrl = webhookUrl;
+    }
+
+    public String getWebhookJql() {
+        return webhookJql;
+    }
+
+    public void setWebhookJql(String webhookJql) {
+        this.webhookJql = webhookJql;
     }
 
     public String getClientId() {

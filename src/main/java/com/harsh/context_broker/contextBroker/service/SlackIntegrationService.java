@@ -51,6 +51,21 @@ PostgreSQL
         return repository.save(integration);
     }
 
+    public SlackIntegration updateSigningSecret(String teamId, String signingSecret) {
+        if (teamId == null || teamId.isBlank()) {
+            throw new IllegalArgumentException("Slack team ID cannot be null or blank");
+        }
+        if (signingSecret == null || signingSecret.isBlank()) {
+            throw new IllegalArgumentException("Slack signing secret cannot be null or blank");
+        }
+
+        SlackIntegration integration = repository.findByTeamId(teamId)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown Slack team"));
+
+        integration.setSigningSecret(encryptionService.encrypt(signingSecret));
+        return repository.save(integration);
+    }
+
     public SlackIntegration createFromOAuth(
             String tenantId,
             SlackOAuthAccessResponse response

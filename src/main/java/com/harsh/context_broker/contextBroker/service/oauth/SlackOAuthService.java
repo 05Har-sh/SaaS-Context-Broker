@@ -71,7 +71,7 @@ public class SlackOAuthService {
 
         if (!response.ok()) {
             throw new IllegalStateException(
-                    "Slack OAuth exchange failed: "
+                    "Slack OAuth exchange failed: " + response.error()
             );
         }
         return slackIntegrationService.createFromOAuth(stateData.tenantId(), response);

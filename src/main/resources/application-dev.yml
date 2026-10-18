@@ -3,6 +3,12 @@ rate-limit:
     capacity: 5
     refill-rate: 1
     ttl-seconds: 300
+keycloak:
+  admin:
+    server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8080}
+    realm: ${KEYCLOAK_REALM:context-broker-dev}
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:context-broker-admin}
+    client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
 spring:
   data:
     redis:
@@ -48,6 +54,7 @@ jira:
     client-secret: ${JIRA_CLIENT_SECRET}
     redirect-uri: ${JIRA_OAUTH_REDIRECT_URI}
     scopes: ${JIRA_OAUTH_SCOPES:read:jira-work write:jira-work offline_access manage:jira-webhook}
-
+    webhook-url: ${JIRA_WEBHOOK_URL:https://surprise-drainer-expenses.ngrok-free.dev/incoming/jira}
+    webhook-jql: ${JIRA_WEBHOOK_JQL:project = ABC}
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}

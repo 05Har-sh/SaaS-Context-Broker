@@ -1,12 +1,15 @@
 package com.harsh.context_broker.contextBroker.oauth.jirastate;
 
 import com.harsh.context_broker.contextBroker.oauth.OAuthStateData;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -22,27 +25,59 @@ public class JiraOAuthStateService {
     public JiraOAuthStateService(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
+
     public String createState(String tenantId, String userId) {
+        if (tenantId == null || tenantId.isBlank()
+                || userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Tenant ID and user ID are required for OAuth state"
+            );
+        }
+
         byte[] randomBytes = new byte[32];
         secureRandom.nextBytes(randomBytes);
 
-        String state = Base64.getEncoder()
+        String state = Base64.getUrlEncoder()
                 .withoutPadding()
                 .encodeToString(randomBytes);
 
         String key = KEY_PREFIX + state;
 
-        redisTemplate.opsForHash().put(key, "tenantId", tenantId);
-        redisTemplate.opsForHash().put(key, "userId", userId);
-        redisTemplate.expire(key, STATE_TTL);
+        List<Object> results = redisTemplate.execute(
+                new SessionCallback<>() {
+                    @Override
+                    public List<Object> execute(
+                            RedisOperations operations) {
+                        operations.multi();
+                        operations.opsForHash().put(
+                                key, "tenantId", tenantId);
+                        operations.opsForHash().put(
+                                key, "userId", userId);
+                        operations.expire(key, STATE_TTL);
+                        return operations.exec();
+                    }
+                }
+        );
+
+        if (results == null) {
+            throw new IllegalStateException(
+                    "Failed to persist Jira OAuth state"
+            );
+        }
 
         return state;
     }
+
     public OAuthStateData consumeState(String state) {
         if (state == null || state.isBlank()) {
             throw new IllegalArgumentException("OAuth state is missing");
         }
         String key = KEY_PREFIX + state;
+
+        Boolean exists = redisTemplate.hasKey(key);
+        System.out.println(
+                "Jira OAuth state exists in Redis: " + exists
+        );
 
         Map<Object, Object> values = redisTemplate.opsForHash().entries(key);
 

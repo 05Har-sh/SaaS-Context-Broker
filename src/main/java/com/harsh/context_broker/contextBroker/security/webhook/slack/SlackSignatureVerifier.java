@@ -1,5 +1,7 @@
 package com.harsh.context_broker.contextBroker.security.webhook.slack;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
@@ -21,6 +23,7 @@ import java.security.MessageDigest;
 
 @Component
 public class SlackSignatureVerifier {
+    private static final Logger log = LoggerFactory.getLogger(SlackSignatureVerifier.class);
 
     public static final long MAX_TIMESTAMP_AGE_SECONDS = 60 * 5;
 
@@ -31,9 +34,11 @@ public class SlackSignatureVerifier {
             String signingSecret){
 
         if (timestamp == null || timestamp.isBlank()) {
+            log.warn("Slack webhook rejected: reason=TIMESTAMP_INVALID, hasTimestampHeader=false, hasSignatureHeader={}", signature != null && !signature.isBlank());
             return false;
         }
         if (signature == null || signature.isBlank()) {
+            log.warn("Slack webhook rejected: reason=SIGNATURE_INVALID, hasTimestampHeader=true, hasSignatureHeader=false");
             return false;
         }
         if (rawBody == null) {
@@ -46,17 +51,23 @@ public class SlackSignatureVerifier {
         try{
             requestTimestamp = Long.parseLong(timestamp);
         } catch (NumberFormatException e) {
+            log.warn("Slack webhook rejected: reason=TIMESTAMP_INVALID, hasTimestampHeader=true, hasSignatureHeader=true");
             return false;
         }
         long currentTimestamp = System.currentTimeMillis() / 1000;
 
 
         if (Math.abs(currentTimestamp - requestTimestamp) > MAX_TIMESTAMP_AGE_SECONDS) {
+            log.warn("Slack webhook rejected: reason=TIMESTAMP_INVALID, hasTimestampHeader=true, hasSignatureHeader=true");
             return false;
         }
         String expectedSignature = calculateSignature(timestamp, rawBody, signingSecret);
 
-        return MessageDigest.isEqual(expectedSignature.getBytes(StandardCharsets.UTF_8),signature.getBytes(StandardCharsets.UTF_8));
+        boolean valid = MessageDigest.isEqual(expectedSignature.getBytes(StandardCharsets.UTF_8), signature.getBytes(StandardCharsets.UTF_8));
+        if (!valid) {
+            log.warn("Slack webhook rejected: reason=SIGNATURE_INVALID, hasTimestampHeader=true, hasSignatureHeader=true");
+        }
+        return valid;
     }
     private String calculateSignature(String timestamp, String rawBody, String signingSecret) {
         try {

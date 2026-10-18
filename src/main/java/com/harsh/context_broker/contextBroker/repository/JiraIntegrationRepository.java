@@ -9,4 +9,7 @@ public interface JiraIntegrationRepository
         extends JpaRepository<JiraIntegration, Long> {
 
     Optional<JiraIntegration> findByJiraWebhookId(String jiraWebhookId);
+
+    // Tenant-scoped lookup
+    java.util.List<JiraIntegration> findAllByTenantId(String tenantId);
 }

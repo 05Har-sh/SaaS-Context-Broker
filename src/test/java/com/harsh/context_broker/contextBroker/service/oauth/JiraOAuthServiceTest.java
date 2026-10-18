@@ -1,5 +1,6 @@
 package com.harsh.context_broker.contextBroker.service.oauth;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.harsh.context_broker.contextBroker.client.AtlassianOAuthClient;
 import com.harsh.context_broker.contextBroker.config.jiraoauth.JiraOAuthProperties;
 import com.harsh.context_broker.contextBroker.dto.oauth.jira.AtlassianAccessibleResourceResponse;
@@ -190,16 +191,16 @@ class JiraOAuthServiceTest {
                 List.of(new JiraWebhookRegistrationRequest.WebhookDetails("project = KEY", List.of("issue_created")))
         );
 
-        List<JiraWebhookRegistrationResponse> response = List.of(
-                new JiraWebhookRegistrationResponse(42L, List.of())
+        JiraWebhookRegistrationResponse response = new JiraWebhookRegistrationResponse(
+                List.of(new JiraWebhookRegistrationResponse.WebhookResult(42L, List.of()))
         );
 
         when(oauthClient.registerWebhooks("cloud-123", "access-token", request)).thenReturn(response);
 
-        List<JiraWebhookRegistrationResponse> result = jiraOAuthService.registerWebhooks("cloud-123", "access-token", request);
+        JiraWebhookRegistrationResponse result = jiraOAuthService.registerWebhooks("cloud-123", "access-token", request);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).createdWebhookId()).isEqualTo(42L);
+        assertThat(result.webhookRegistrationResult()).hasSize(1);
+        assertThat(result.webhookRegistrationResult().get(0).createdWebhookId()).isEqualTo(42L);
         verify(oauthClient).registerWebhooks("cloud-123", "access-token", request);
     }
 
@@ -289,9 +290,11 @@ class JiraOAuthServiceTest {
         );
         when(oauthClient.getAccessibleResources("access-token")).thenReturn(List.of(resource));
 
-        JiraWebhookRegistrationResponse webhookResponse = new JiraWebhookRegistrationResponse(987L, List.of());
+        JiraWebhookRegistrationResponse webhookResponse = new JiraWebhookRegistrationResponse(
+                List.of(new JiraWebhookRegistrationResponse.WebhookResult(987L, List.of()))
+        );
         when(oauthClient.registerWebhooks(eq("cloud-123"), eq("access-token"), any(JiraWebhookRegistrationRequest.class)))
-                .thenReturn(List.of(webhookResponse));
+                .thenReturn(webhookResponse);
 
         JiraIntegration integration = new JiraIntegration();
         when(integrationService.createFromOAuth("cloud-123", "https://mycompany.atlassian.net", "My Jira", "access-token", "refresh-token", "987")).thenReturn(integration);
@@ -303,6 +306,99 @@ class JiraOAuthServiceTest {
         verify(oauthClient).exchangeCode("code-123");
         verify(oauthClient).getAccessibleResources("access-token");
         verify(oauthClient).registerWebhooks(eq("cloud-123"), eq("access-token"), any(JiraWebhookRegistrationRequest.class));
+        verify(integrationService).createFromOAuth("cloud-123", "https://mycompany.atlassian.net", "My Jira", "access-token", "refresh-token", "987");
+    }
+
+    @Test
+    void shouldSerializeWebhookRequestWithJqlFilter() throws Exception {
+        JiraWebhookRegistrationRequest request = new JiraWebhookRegistrationRequest(
+                "https://example.com/jira/webhook",
+                List.of(new JiraWebhookRegistrationRequest.WebhookDetails(
+                        "project = ABC",
+                        List.of("jira:issue_created", "jira:issue_updated", "jira:issue_deleted")
+                ))
+        );
+
+        String json = new ObjectMapper().writeValueAsString(request);
+
+        assertThat(json)
+                .contains("\"url\":\"https://example.com/jira/webhook\"")
+                .contains("\"jqlFilter\":\"project = ABC\"")
+                .contains("\"events\":[\"jira:issue_created\",\"jira:issue_updated\",\"jira:issue_deleted\"]");
+    }
+
+    @Test
+    void shouldIncludeConfiguredJqlWhenRegisteringWebhooks() {
+        JiraOAuthProperties properties = new JiraOAuthProperties();
+        properties.setWebhookUrl("https://example.com/jira/webhook");
+        properties.setWebhookJql("project = ABC");
+
+        JiraOAuthStateService stateService = mock(JiraOAuthStateService.class);
+        AtlassianOAuthClient oauthClient = mock(AtlassianOAuthClient.class);
+        JiraIntegrationService integrationService = mock(JiraIntegrationService.class);
+        JiraOAuthService service = newService(properties, stateService, oauthClient, integrationService);
+
+        when(stateService.consumeState("state-abc")).thenReturn(new OAuthStateData("tenant-123", "user-456"));
+        when(oauthClient.exchangeCode("code-123")).thenReturn(new AtlassianOAuthTokenResponse("access-token", 3600L, "read:jira-work", "refresh-token"));
+
+        AtlassianAccessibleResourceResponse resource = new AtlassianAccessibleResourceResponse(
+                "cloud-123", "My Jira", "https://mycompany.atlassian.net", List.of("read:jira-work"), null
+        );
+        when(oauthClient.getAccessibleResources("access-token")).thenReturn(List.of(resource));
+
+        JiraWebhookRegistrationResponse webhookResponse = new JiraWebhookRegistrationResponse(
+                List.of(new JiraWebhookRegistrationResponse.WebhookResult(987L, List.of()))
+        );
+        when(oauthClient.registerWebhooks(eq("cloud-123"), eq("access-token"), any(JiraWebhookRegistrationRequest.class)))
+                .thenAnswer(invocation -> {
+                    JiraWebhookRegistrationRequest request = invocation.getArgument(2);
+                    assertThat(request.webhooks()).hasSize(1);
+                    assertThat(request.webhooks().get(0).jqlFilter()).isEqualTo("project = ABC");
+                    assertThat(request.webhooks().get(0).events()).containsExactly(
+                            "jira:issue_created",
+                            "jira:issue_updated",
+                            "jira:issue_deleted");
+                    return webhookResponse;
+                });
+
+        JiraIntegration integration = new JiraIntegration();
+        when(integrationService.createFromOAuth("cloud-123", "https://mycompany.atlassian.net", "My Jira", "access-token", "refresh-token", "987")).thenReturn(integration);
+
+        service.handleCallback("code-123", "state-abc");
+    }
+
+    @Test
+    void shouldHandleWebhookResultErrorsAndPickSuccessfulWebhookId() {
+        JiraOAuthProperties properties = new JiraOAuthProperties();
+        properties.setWebhookUrl("https://example.com/jira/webhook");
+
+        JiraOAuthStateService stateService = mock(JiraOAuthStateService.class);
+        AtlassianOAuthClient oauthClient = mock(AtlassianOAuthClient.class);
+        JiraIntegrationService integrationService = mock(JiraIntegrationService.class);
+        JiraOAuthService service = newService(properties, stateService, oauthClient, integrationService);
+
+        when(stateService.consumeState("state-abc")).thenReturn(new OAuthStateData("tenant-123", "user-456"));
+        when(oauthClient.exchangeCode("code-123")).thenReturn(new AtlassianOAuthTokenResponse("access-token", 3600L, "read:jira-work", "refresh-token"));
+
+        AtlassianAccessibleResourceResponse resource = new AtlassianAccessibleResourceResponse(
+                "cloud-123", "My Jira", "https://mycompany.atlassian.net", List.of("read:jira-work"), null
+        );
+        when(oauthClient.getAccessibleResources("access-token")).thenReturn(List.of(resource));
+
+        JiraWebhookRegistrationResponse webhookResponse = new JiraWebhookRegistrationResponse(
+                List.of(
+                        new JiraWebhookRegistrationResponse.WebhookResult(null, List.of("The clause watchCount is unsupported")),
+                        new JiraWebhookRegistrationResponse.WebhookResult(987L, List.of())
+                )
+        );
+        when(oauthClient.registerWebhooks(eq("cloud-123"), eq("access-token"), any(JiraWebhookRegistrationRequest.class)))
+                .thenReturn(webhookResponse);
+
+        JiraIntegration integration = new JiraIntegration();
+        when(integrationService.createFromOAuth("cloud-123", "https://mycompany.atlassian.net", "My Jira", "access-token", "refresh-token", "987")).thenReturn(integration);
+
+        service.handleCallback("code-123", "state-abc");
+
         verify(integrationService).createFromOAuth("cloud-123", "https://mycompany.atlassian.net", "My Jira", "access-token", "refresh-token", "987");
     }
 
