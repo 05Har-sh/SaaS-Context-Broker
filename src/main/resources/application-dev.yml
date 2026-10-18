@@ -54,6 +54,7 @@ jira:
     client-secret: ${JIRA_CLIENT_SECRET}
     redirect-uri: ${JIRA_OAUTH_REDIRECT_URI}
     scopes: ${JIRA_OAUTH_SCOPES:read:jira-work write:jira-work offline_access manage:jira-webhook}
-
+    webhook-url: ${JIRA_WEBHOOK_URL:https://surprise-drainer-expenses.ngrok-free.dev/incoming/jira}
+    webhook-jql: ${JIRA_WEBHOOK_JQL:project = ABC}
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
