@@ -145,6 +145,12 @@ public class SlackWebhookFilter implements Filter {
             return;
         }
 
+        if (!integration.isActive()) {
+            log.warn("Slack webhook rejected: reason=INTEGRATION_DISABLED, teamId={}, integrationLookupSucceeded=true", teamId);
+            httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
+
         // 3. Rate-limit the candidate integration.
         String rateLimitKey =
                 "rate_limit:slack:integration:" + integration.getId();

@@ -8,6 +8,10 @@ import java.util.Optional;
 public interface SlackIntegrationRepository extends JpaRepository<SlackIntegration, Long> {
     Optional<SlackIntegration> findByTeamId(String teamId);
 
+    Optional<SlackIntegration> findByTeamIdAndTenantId(String teamId, String tenantId);
+
+    Optional<SlackIntegration> findByIdAndTenantId(Long id, String tenantId);
+
     // Tenant-scoped lookup
     java.util.List<SlackIntegration> findAllByTenantId(String tenantId);
 }

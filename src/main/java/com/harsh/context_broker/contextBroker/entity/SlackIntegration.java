@@ -27,6 +27,9 @@ public class SlackIntegration {
     @Column(name = "access_token_encrypted")
     private String accessTokenEncrypted;
 
+    @Column(name = "is_active", nullable = false)
+    private boolean active = true;
+
     public Long getId() {
         return id;
     }
@@ -81,5 +84,13 @@ public class SlackIntegration {
 
     public void setAccessTokenEncrypted(String accessTokenEncrypted) {
         this.accessTokenEncrypted = accessTokenEncrypted;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 }

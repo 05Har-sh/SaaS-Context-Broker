@@ -70,6 +70,10 @@ public class jiraWebhookFilter extends OncePerRequestFilter {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unknown Jira webhook");
             return;
         }
+        if (integration.getConnectionStatus() != null && integration.getConnectionStatus() != com.harsh.context_broker.contextBroker.model.JiraConnectionStatus.CONNECTED) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Disconnected Jira webhook");
+            return;
+        }
 
         String rateLimitKey =  "rate_limit:jira:integration:" + integration.getId();
         boolean allowed = rateLimiter.isAllowed(rateLimitKey);

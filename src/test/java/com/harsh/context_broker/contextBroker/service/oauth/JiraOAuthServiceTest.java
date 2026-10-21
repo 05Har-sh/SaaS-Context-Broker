@@ -276,6 +276,7 @@ class JiraOAuthServiceTest {
     void shouldHandleSuccessfulCallbackAndCreateIntegration() {
         JiraOAuthProperties properties = new JiraOAuthProperties();
         properties.setWebhookUrl("https://example.com/jira/webhook");
+        properties.setWebhookJql("project = ABC");
 
         JiraOAuthStateService stateService = mock(JiraOAuthStateService.class);
         AtlassianOAuthClient oauthClient = mock(AtlassianOAuthClient.class);
@@ -371,6 +372,7 @@ class JiraOAuthServiceTest {
     void shouldHandleWebhookResultErrorsAndPickSuccessfulWebhookId() {
         JiraOAuthProperties properties = new JiraOAuthProperties();
         properties.setWebhookUrl("https://example.com/jira/webhook");
+        properties.setWebhookJql("project = ABC");
 
         JiraOAuthStateService stateService = mock(JiraOAuthStateService.class);
         AtlassianOAuthClient oauthClient = mock(AtlassianOAuthClient.class);
@@ -400,6 +402,28 @@ class JiraOAuthServiceTest {
         service.handleCallback("code-123", "state-abc");
 
         verify(integrationService).createFromOAuth("cloud-123", "https://mycompany.atlassian.net", "My Jira", "access-token", "refresh-token", "987");
+    }
+
+    @Test
+    void shouldRejectMissingWebhookJqlBeforeRegistration() {
+        JiraOAuthProperties properties = new JiraOAuthProperties();
+        properties.setWebhookUrl("https://example.com/jira/webhook");
+        properties.setWebhookJql("   ");
+
+        JiraOAuthStateService stateService = mock(JiraOAuthStateService.class);
+        AtlassianOAuthClient oauthClient = mock(AtlassianOAuthClient.class);
+        JiraIntegrationService integrationService = mock(JiraIntegrationService.class);
+        JiraOAuthService service = newService(properties, stateService, oauthClient, integrationService);
+
+        when(stateService.consumeState("state-abc")).thenReturn(new OAuthStateData("tenant-123", "user-456"));
+        when(oauthClient.exchangeCode("code-123")).thenReturn(new AtlassianOAuthTokenResponse("access-token", 3600L, "read:jira-work", "refresh-token"));
+        when(oauthClient.getAccessibleResources("access-token")).thenReturn(List.of(
+                new AtlassianAccessibleResourceResponse("cloud-123", "My Jira", "https://mycompany.atlassian.net", List.of("read:jira-work"), null)
+        ));
+
+        assertThatThrownBy(() -> service.handleCallback("code-123", "state-abc"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Jira webhook JQL is required");
     }
 
     @Test

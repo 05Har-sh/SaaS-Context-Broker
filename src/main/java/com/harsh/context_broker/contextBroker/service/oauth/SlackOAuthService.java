@@ -28,6 +28,9 @@ public class SlackOAuthService {
 
     public String createAuthorizationUrl(Authentication authentication) {
         String tenantId = TenantContext.requireTenantId();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new IllegalStateException("Authenticated user is required for Slack OAuth");
+        }
         String userId = authentication.getName();
         String state = stateService.createState(tenantId, userId);
 
@@ -66,20 +69,22 @@ public class SlackOAuthService {
                     "Slack OAuth state is missing"
             );
         }
+
         OAuthStateData stateData = stateService.consumeState(state);
-        SlackOAuthAccessResponse response = slackOAuthClient.exchangeCode(code);
+        TenantContext.setTenantId(stateData.tenantId());
 
-        if (!response.ok()) {
-            throw new IllegalStateException(
-                    "Slack OAuth exchange failed: " + response.error()
-            );
+        try {
+            SlackOAuthAccessResponse response = slackOAuthClient.exchangeCode(code);
+
+            if (!response.ok()) {
+                throw new IllegalStateException(
+                        "Slack OAuth exchange failed: " + response.error()
+                );
+            }
+
+            return slackIntegrationService.createFromOAuth(stateData.tenantId(), response);
+        } finally {
+            TenantContext.clear();
         }
-        return slackIntegrationService.createFromOAuth(stateData.tenantId(), response);
-
-//        return new SlackOAuthCallbackResult(
-//                stateData.tenantId(),
-//                stateData.userId(),
-//                response
-//        );
     }
 }
