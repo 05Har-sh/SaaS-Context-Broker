@@ -34,7 +34,7 @@ spring:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/context-broker-dev}
 security:
   credential-encryption:
-    key: ${CREDENTIAL_ENCRYPTION_KEY:my-local-dev-default-key}
+    key: ${CREDENTIAL_ENCRYPTION_KEY:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
 
 logging:
   level:
@@ -42,10 +42,10 @@ logging:
 
 slack:
   oauth:
-    client-id: ${SLACK_CLIENT_ID}
-    client-secret: ${SLACK_CLIENT_SECRET}
-    signing-secret: ${SLACK_SIGNING_SECRET}
-    redirect-uri: ${SLACK_OAUTH_REDIRECT_URI}
+    client-id: ${SLACK_CLIENT_ID:test-client-id}
+    client-secret: ${SLACK_CLIENT_SECRET:test-client-secret}
+    signing-secret: ${SLACK_SIGNING_SECRET:test-slack-signing-secret}
+    redirect-uri: ${SLACK_OAUTH_REDIRECT_URI:http://localhost:8080/integrations/slack/oauth/callback}
     scopes: ${SLACK_OAUTH_SCOPES:channels:history,channels:read}
 
 jira:
@@ -55,6 +55,6 @@ jira:
     redirect-uri: ${JIRA_OAUTH_REDIRECT_URI}
     scopes: ${JIRA_OAUTH_SCOPES:read:jira-work write:jira-work offline_access manage:jira-webhook}
     webhook-url: ${JIRA_WEBHOOK_URL:https://surprise-drainer-expenses.ngrok-free.dev/incoming/jira}
-    webhook-jql: ${JIRA_WEBHOOK_JQL:project = ABC}
+    webhook-jql: ${JIRA_WEBHOOK_JQL:}
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}

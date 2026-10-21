@@ -177,10 +177,10 @@ public class JiraOAuthService {
             if (properties.getWebhookUrl() == null || properties.getWebhookUrl().isBlank()) {
                 throw new IllegalStateException("Jira webhook URL is missing");
             }
-
-            String webhookJql = properties.getWebhookJql() != null && !properties.getWebhookJql().isBlank()
-                    ? properties.getWebhookJql()
-                    : "project = ABC";
+            String webhookJql = properties.getWebhookJql();
+            if (webhookJql == null || webhookJql.isBlank()) {
+                throw new IllegalStateException("Jira webhook JQL is required for a valid registration");
+            }
 
             JiraWebhookRegistrationRequest webhookRequest =
                     new JiraWebhookRegistrationRequest(

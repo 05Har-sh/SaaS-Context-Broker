@@ -28,7 +28,7 @@ public class IntegrationService {
 
         List<SlackIntegration> slackIntegrations = slackRepository.findAllByTenantId(tenantId);
         for (SlackIntegration s : slackIntegrations) {
-            boolean connected = s.getAccessTokenEncrypted() != null && !s.getAccessTokenEncrypted().isBlank();
+            boolean connected = s.isActive() && s.getAccessTokenEncrypted() != null && !s.getAccessTokenEncrypted().isBlank();
             String displayName = s.getTeamName() != null && !s.getTeamName().isBlank() ? s.getTeamName() : s.getTeamId();
             results.add(new IntegrationSummary(s.getId(), "SLACK", connected, displayName));
         }

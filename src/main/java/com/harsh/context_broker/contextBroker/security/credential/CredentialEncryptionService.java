@@ -8,6 +8,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 
@@ -22,13 +23,34 @@ public class CredentialEncryptionService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public CredentialEncryptionService(
-            @Value("${security.credential-encryption.key}") String base64Key
+            @Value("${security.credential-encryption.key}") String keyValue
     ) {
-        byte[] keyBytes = Base64.getDecoder().decode(base64Key);
+        if (keyValue == null || keyValue.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Credential encryption key is required"
+            );
+        }
+
+        byte[] keyBytes;
+        String normalizedKey = keyValue.trim();
+
+        try {
+            keyBytes = Base64.getDecoder().decode(normalizedKey);
+        } catch (IllegalArgumentException ex) {
+            try {
+                keyBytes = MessageDigest.getInstance("SHA-256")
+                        .digest(normalizedKey.getBytes(StandardCharsets.UTF_8));
+            } catch (Exception digestException) {
+                throw new IllegalArgumentException(
+                        "Credential encryption key is invalid",
+                        digestException
+                );
+            }
+        }
 
         if (keyBytes.length != 32) {
             throw new IllegalArgumentException(
-                    "Credential encryption key must be 256 bits"
+                    "Credential encryption key must resolve to 256 bits"
             );
         }
 

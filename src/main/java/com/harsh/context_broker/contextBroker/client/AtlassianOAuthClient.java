@@ -200,6 +200,24 @@ public class AtlassianOAuthClient {
         }
     }
 
+    public void deleteWebhook(String cloudId, String webhookId, String accessToken) {
+        if (cloudId == null || cloudId.isBlank()) {
+            throw new IllegalArgumentException("Cloud ID is missing for Jira webhook cleanup");
+        }
+        if (webhookId == null || webhookId.isBlank()) {
+            throw new IllegalArgumentException("Webhook ID is missing for Jira webhook cleanup");
+        }
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalArgumentException("Access token is missing for Jira webhook cleanup");
+        }
+
+        apiRestClient.delete()
+                .uri("/ex/jira/{cloudId}/rest/api/3/webhook/{webhookId}", cloudId, webhookId)
+                .header("Authorization", "Bearer " + accessToken)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
     private String readResponseBody(ClientHttpResponse response) {
         try {
             if (response.getBody() == null) {
