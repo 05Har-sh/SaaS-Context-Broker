@@ -1,7 +1,7 @@
 # Context Broker 
 
 <p align="center">
-  <img src="docs/images/context-broker-logo.png" alt="Context Broker Logo" />
+  <img src="docs/images/context-broker-logo.png" alt="Context Broker Logo" width="200" />
 </p>
 
 ![Java 21](https://img.shields.io/badge/Java-21-437291?logo=openjdk)
